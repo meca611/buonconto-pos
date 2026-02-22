@@ -27,15 +27,18 @@
     /* LINE Seed JP フォントの読み込み */
     @import url('https://cdn.jsdelivr.net/npm/@line/seed@1.0.0/app/css/seed.css');
     
-    :root {
-      /* モバイルブラウザのアドレスバーを考慮した正確な高さ */
-      --app-height: 100dvh;
+    html, body {
+      height: 100%;
+      margin: 0;
+      padding: 0;
+      touch-action: manipulation;
     }
 
     body {
-      height: var(--app-height);
-      overflow: hidden; /* 全体のスクロールを止め、内部エリアでスクロールさせる */
-      touch-action: manipulation; /* ダブルタップによる意図しないズームを防止 */
+      display: flex;
+      flex-direction: column;
+      background-color: #F4F7F5;
+      color: #111111;
     }
 
     /* システム名ロゴ用フォント */
@@ -44,13 +47,15 @@
       font-weight: 800;
     }
 
+    /* 印刷時の設定 */
     @media print {
       .no-print { display: none !important; }
-      body, #app-container, main { 
+      body, html, #app-container, main { 
         height: auto !important; 
+        display: block !important;
         overflow: visible !important; 
+        background: white !important;
       }
-      body { background: white; padding: 0; margin: 0; }
     }
 
     /* 横スクロールバー非表示（メニューカテゴリ用） */
@@ -58,9 +63,9 @@
     .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
   </style>
 </head>
-<body class="bg-[#F4F7F5] font-sans print:bg-white text-[#111111] flex flex-col">
+<body>
 
-  <!-- 初期ロード画面（ドメイン認証説明付き） -->
+  <!-- 初期ロード画面 -->
   <div id="initial-loading" class="fixed inset-0 z-[200] flex flex-col items-center justify-center bg-[#F4F7F5] p-6 text-center">
     <div class="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-[#0F543C] mb-6"></div>
     <p class="font-bold text-[#0F543C] text-2xl mb-2 tracking-tighter">BuonConto 起動中...</p>
@@ -85,26 +90,29 @@
   <div id="auth-overlay" class="hidden fixed inset-0 z-[150] flex flex-col items-center justify-center bg-[#0F543C] p-4 overflow-y-auto"></div>
 
   <!-- アプリ本体コンテナ -->
-  <div id="app-container" class="hidden flex-col flex-1 min-h-0 overflow-hidden relative">
+  <div id="app-container" class="hidden flex-col h-full w-full">
     
     <!-- 印刷用ビュー -->
     <div id="print-view-container" class="hidden print:block absolute top-0 left-0 w-full bg-white text-black p-8 font-mono text-sm z-50"></div>
 
-    <!-- ヘッダー -->
-    <header id="header-container" class="bg-[#0F543C] text-white p-3 lg:p-4 shadow-md no-print flex justify-between items-center shrink-0 z-20" role="banner"></header>
+    <!-- ヘッダー (固定) -->
+    <header id="header-container" class="bg-[#0F543C] text-white p-3 lg:p-4 shadow-md no-print flex justify-between items-center shrink-0 z-20"></header>
 
-    <!-- メインコンテンツ -->
-    <main id="main-content" class="flex-1 min-h-0 overflow-hidden no-print flex flex-col relative bg-white lg:bg-[#F4F7F5] z-10"></main>
+    <!-- メインコンテンツ (スクロール領域) -->
+    <main id="main-content" class="flex-1 overflow-y-auto overflow-x-hidden no-print relative bg-[#F4F7F5] z-10 w-full"></main>
 
-    <!-- フッター (スマホの下部ナビに隠れないようにパディングを調整) -->
-    <footer class="bg-[#0A3D2B] text-white py-4 px-6 text-xs no-print border-t-4 border-[#0F543C] flex justify-between items-center shrink-0 pb-24 lg:pb-4 z-0 relative" role="contentinfo">
+    <!-- フッター (PC時のみ表示、スマホ時は下部ナビゲーションを表示) -->
+    <footer class="hidden lg:flex bg-[#0A3D2B] text-white py-3 px-6 text-xs no-print border-t-4 border-[#0F543C] justify-between items-center shrink-0 z-20">
       <div class="text-[#AAAAAA] font-bold">&copy; 2026 Midnight Express Computational Archives</div>
-      <div class="flex flex-col items-end opacity-60 hover:opacity-100 transition-opacity">
-        <img src="mecalogo-white.png" alt="MECAロゴ" class="h-6 mb-1 object-contain" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';" />
-        <div class="text-lg tracking-wider system-name leading-none mb-1 hidden">mecalogo-white</div>
+      <div class="flex items-center gap-2 opacity-60 hover:opacity-100 transition-opacity">
+        <img src="mecalogo-white.png" alt="MECAロゴ" class="h-5 object-contain" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';" />
+        <div class="text-sm tracking-wider system-name leading-none hidden">mecalogo-white</div>
         <div class="text-[10px] font-bold">しんやせっけいしゃ（MECA）</div>
       </div>
     </footer>
+
+    <!-- スマホ用下部ナビゲーション (JSで動的に描画) -->
+    <div id="mobile-nav-container" class="lg:hidden shrink-0 w-full z-30 no-print"></div>
 
     <!-- モーダル用 -->
     <div id="modal-container" class="no-print"></div>
@@ -113,7 +121,7 @@
   <!-- Firebase & Logic -->
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-    import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+    import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
     import { getFirestore, doc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
     // --- Firebase設定 ---
@@ -407,7 +415,7 @@
         appBox.classList.add('hidden');
         authBox.classList.remove('hidden');
         authBox.innerHTML = `
-          <div class="bg-white p-10 rounded-[40px] shadow-2xl max-w-md w-full text-center border-4 border-[#0F543C]">
+          <div class="bg-white p-10 rounded-[40px] shadow-2xl max-w-md w-full text-center border-4 border-[#0F543C] m-4">
             <i data-lucide="utensils-crossed" class="w-16 h-16 text-[#0F543C] mx-auto mb-4"></i>
             <h1 class="text-4xl font-black text-[#0F543C] mb-2 system-name tracking-tighter">BuonConto</h1>
             <p class="text-gray-500 font-bold mb-10 italic tracking-widest text-sm">Italian POS System</p>
@@ -431,7 +439,7 @@
         appBox.classList.add('hidden');
         authBox.classList.remove('hidden');
         authBox.innerHTML = `
-          <div class="bg-white p-10 rounded-[40px] text-center max-w-sm border-4 border-[#0F543C] shadow-2xl">
+          <div class="bg-white p-10 rounded-[40px] text-center max-w-sm border-4 border-[#0F543C] shadow-2xl m-4">
             <i data-lucide="clock" class="w-16 h-16 text-orange-500 mx-auto mb-4 animate-pulse"></i>
             <h2 class="text-2xl font-black mb-4">承認待ちです</h2>
             <p class="font-bold text-gray-500 mb-8 text-sm leading-relaxed">
@@ -448,7 +456,7 @@
       authBox.classList.add('hidden');
       appBox.classList.remove('hidden');
 
-      // ヘッダーナビゲーションの描画
+      // ヘッダーナビゲーションの準備
       const pkCount = state.kitchenTickets.filter(t => t.status === 'pending').length;
       const navItems = [
         {id:'pos', label:'注文', icon:'calculator'},
@@ -458,10 +466,11 @@
         {id:'settings', label:'設定', icon:'settings'}
       ];
 
+      // ヘッダー描画 (PC時はタブを表示、スマホ時は非表示)
       document.getElementById('header-container').innerHTML = `
         <div class="flex items-center gap-3">
-          <i data-lucide="utensils-crossed" class="w-8 h-8 text-[#FFC700]"></i>
-          <h1 class="text-2xl font-black system-name tracking-tighter">BuonConto</h1>
+          <i data-lucide="utensils-crossed" class="w-6 lg:w-8 h-6 lg:h-8 text-[#FFC700]"></i>
+          <h1 class="text-xl lg:text-2xl font-black system-name tracking-tighter">BuonConto</h1>
         </div>
         <div class="flex items-center gap-2">
           <nav class="hidden lg:flex gap-1 bg-[#0A3D2B] p-1 rounded-xl">
@@ -478,9 +487,22 @@
         </div>
       `;
 
+      // スマホ用下部ナビゲーション描画
+      document.getElementById('mobile-nav-container').innerHTML = `
+        <div class="bg-white border-t-2 border-gray-100 flex justify-around p-2 pb-safe shadow-[0_-4px_10px_rgba(0,0,0,0.05)]">
+           ${navItems.map(t => `
+             <button onclick="window.setTab('${t.id}')" class="flex flex-col items-center justify-center w-16 h-14 gap-1 rounded-xl transition-colors ${state.activeTab === t.id ? 'text-[#0F543C] bg-green-50' : 'text-gray-400 hover:bg-gray-50'} relative">
+               <i data-lucide="${t.icon}" class="w-6 h-6"></i>
+               <span class="text-[9px] font-bold">${t.label}</span>
+               ${t.badge ? `<span class="absolute top-1 right-2 bg-red-500 text-white text-[8px] px-1.5 rounded-full">${t.badge}</span>` : ''}
+             </button>
+           `).join('')}
+        </div>
+      `;
+
       // メインコンテンツの切り替え
       const main = document.getElementById('main-content');
-      if (state.activeTab === 'pos') main.innerHTML = getPosHTML(navItems);
+      if (state.activeTab === 'pos') main.innerHTML = getPosHTML();
       else if (state.activeTab === 'kitchen') main.innerHTML = getKitchenHTML();
       else if (state.activeTab === 'sales') main.innerHTML = getSalesHTML();
       else if (state.activeTab === 'menu') main.innerHTML = getMenuHTML();
@@ -495,17 +517,18 @@
 
     // --- HTMLコンポーネント群 ---
 
-    function getPosHTML(navItems) {
+    function getPosHTML() {
       const order = state.tableOrders[state.selectedTable] || [];
       const sub = order.reduce((s, o) => s + (o.item.price + o.extra) * o.qty, 0);
       const total = sub + Math.floor(sub * 0.1);
       const filteredMenu = state.selectedCategory === 'すべて' ? state.menu : state.menu.filter(m => m.category === state.selectedCategory);
 
       return `
-        <div class="flex flex-col lg:flex-row h-full overflow-hidden">
+        <div class="flex flex-col lg:flex-row h-full overflow-hidden w-full">
           
           <!-- メニューエリア (左側) -->
           <div class="flex-1 flex flex-col min-h-0 bg-white lg:bg-transparent overflow-hidden">
+            <!-- カテゴリフィルタ -->
             <div class="p-3 bg-white/60 border-b flex gap-2 overflow-x-auto no-scrollbar shrink-0 shadow-sm">
               ${CATEGORIES.map(c => `
                 <button onclick="window.setCategory('${c}')" class="px-5 py-2.5 rounded-full border-2 font-black text-sm whitespace-nowrap transition-all ${state.selectedCategory === c ? 'bg-[#0F543C] text-white border-[#0F543C] shadow-lg' : 'bg-white border-gray-300 text-gray-500 hover:border-gray-400'}">
@@ -514,7 +537,8 @@
               `).join('')}
             </div>
             
-            <div class="flex-1 overflow-y-auto p-4 grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4 content-start pb-32 lg:pb-4 scroll-container">
+            <!-- メニューグリッド -->
+            <div class="flex-1 overflow-y-auto p-4 grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4 content-start">
               ${filteredMenu.map(m => `
                 <button onclick="window.openCust(${m.id})" class="bg-white border-2 border-gray-100 rounded-[28px] p-5 flex flex-col items-center justify-center text-center shadow-sm hover:border-[#0F543C] transition-all active:scale-95 group min-h-[120px]">
                   <span class="text-[10px] text-gray-400 font-black uppercase tracking-widest">${m.category}</span>
@@ -525,30 +549,33 @@
             </div>
           </div>
 
-          <!-- カートパネル (右側 または モバイル時はスライド) -->
-          <div id="cart-panel" class="fixed inset-y-0 right-0 w-full md:w-[400px] bg-white lg:bg-[#F4F7F5] shadow-2xl lg:shadow-none z-[100] transform transition-transform duration-300 ${state.isMobileCartOpen ? 'translate-x-0' : 'translate-x-full lg:translate-x-0'} flex flex-col border-l-2 border-gray-200">
-            <div class="p-5 bg-white border-b flex flex-col gap-4 shrink-0 shadow-sm">
+          <!-- カートパネル (右側 または モバイル時は右からスライド) -->
+          <div class="fixed inset-y-0 right-0 w-full md:w-[400px] bg-white lg:bg-[#F4F7F5] shadow-2xl lg:shadow-none z-[100] transform transition-transform duration-300 ${state.isMobileCartOpen ? 'translate-x-0' : 'translate-x-full lg:translate-x-0'} flex flex-col border-l-2 border-gray-200 lg:relative lg:h-full">
+            
+            <!-- カートヘッダー（テーブル選択） -->
+            <div class="p-5 bg-white border-b flex flex-col gap-4 shrink-0 shadow-sm z-10">
               <div class="flex justify-between items-center">
                 <span class="font-black text-2xl text-[#0F543C]">卓: ${state.selectedTable}</span>
-                <div class="flex gap-1 bg-gray-100 p-1 rounded-full">
+                <div class="flex gap-1 bg-gray-100 p-1 rounded-full flex-wrap justify-end max-w-[200px]">
                   ${TABLES.map(t => `
-                    <button onclick="window.setTable(${t})" class="w-9 h-9 rounded-full font-black text-sm transition-all ${state.selectedTable === t ? 'bg-[#0F543C] text-white shadow-lg' : 'text-gray-400 hover:text-gray-600' }">${t}</button>
+                    <button onclick="window.setTable(${t})" class="w-9 h-9 rounded-full font-black text-sm transition-all flex-shrink-0 ${state.selectedTable === t ? 'bg-[#0F543C] text-white shadow-lg' : 'text-gray-400 hover:text-gray-600' }">${t}</button>
                   `).join('')}
                 </div>
                 <button onclick="window.toggleCart(false)" class="lg:hidden p-2 text-gray-300 hover:text-gray-500"><i data-lucide="x"></i></button>
               </div>
             </div>
             
-            <div class="flex-1 overflow-y-auto p-5 space-y-4 pb-32 lg:pb-5 scroll-container">
+            <!-- 注文リスト -->
+            <div class="flex-1 overflow-y-auto p-5 space-y-4 bg-gray-50/50">
               ${order.length === 0 ? `
                 <div class="h-full flex flex-col items-center justify-center opacity-10 font-black grayscale">
-                  <i data-lucide="shopping-cart" class="w-24 h-24 mb-4"></i>空っぽです
+                  <i data-lucide="shopping-cart" class="w-24 h-24 mb-4"></i>注文がありません
                 </div>
               ` : 
                 order.map((o, i) => `
                 <div class="bg-white p-4 rounded-[24px] border-2 ${o.sent ? 'border-gray-100 opacity-60' : 'border-[#0F543C] shadow-sm'} transition-all">
                   <div class="flex justify-between font-black text-base">
-                    <span>${o.item.name}${o.sent ? '<span class="ml-2 text-[8px] bg-gray-200 px-1 rounded">注文済</span>' : ''}</span>
+                    <span>${o.item.name}${o.sent ? '<span class="ml-2 text-[8px] bg-gray-200 px-1 rounded">送信済</span>' : ''}</span>
                     <span>¥${((o.item.price + o.extra) * o.qty).toLocaleString()}</span>
                   </div>
                   ${o.note ? `<div class="text-[11px] text-red-600 font-bold mt-2 bg-red-50 p-2 rounded-lg border border-red-100">● ${o.note}</div>` : ''}
@@ -564,7 +591,8 @@
               `).join('')}
             </div>
 
-            <div class="p-6 bg-white border-t space-y-4 shrink-0 shadow-inner pb-28 lg:pb-6">
+            <!-- アクションエリア -->
+            <div class="p-6 bg-white border-t space-y-4 shrink-0 shadow-[0_-10px_20px_rgba(0,0,0,0.03)] z-10">
               <div class="flex justify-between font-black text-3xl text-[#0F543C]">
                 <span>合計</span><span>¥${total.toLocaleString()}</span>
               </div>
@@ -579,23 +607,13 @@
             </div>
           </div>
 
-          <!-- スマホ用フローティングカートボタン -->
-          <button onclick="window.toggleCart(true)" class="lg:hidden fixed bottom-28 right-6 w-16 h-16 bg-[#0F543C] text-white rounded-full shadow-2xl flex items-center justify-center z-50 border-4 border-white transition-transform active:scale-90">
+          <!-- スマホ用フローティングカートボタン (カートが閉じている時のみ表示) -->
+          <button onclick="window.toggleCart(true)" class="lg:hidden fixed bottom-6 right-6 w-16 h-16 bg-[#0F543C] text-white rounded-full shadow-2xl flex items-center justify-center z-40 border-4 border-white transition-transform active:scale-90 ${state.isMobileCartOpen ? 'hidden' : ''}">
             <i data-lucide="shopping-cart"></i>
-            <span class="absolute -top-1 -right-1 bg-[#D32F2F] text-white text-[10px] font-black w-6 h-6 rounded-full flex items-center justify-center border-2 border-white">
+            <span class="absolute -top-1 -right-1 bg-[#D32F2F] text-white text-[10px] font-black w-6 h-6 rounded-full flex items-center justify-center border-2 border-white shadow-sm">
               ${order.reduce((s,o)=>s+o.qty, 0)}
             </span>
           </button>
-
-          <!-- スマホ用 下部タブバー -->
-          <div class="lg:hidden fixed bottom-0 inset-x-0 bg-white border-t-2 border-gray-100 flex justify-around p-2 z-[60]">
-             ${navItems.map(t => `
-               <button onclick="window.setTab('${t.id}')" class="flex flex-col items-center gap-1 py-1 px-3 ${state.activeTab === t.id ? 'text-[#0F543C]' : 'text-gray-400'}">
-                 <i data-lucide="${t.icon}" class="w-6 h-6"></i>
-                 <span class="text-[9px] font-bold">${t.label}</span>
-               </button>
-             `).join('')}
-          </div>
         </div>
       `;
     }
@@ -603,11 +621,11 @@
     function getKitchenHTML() {
       const tickets = state.kitchenTickets.filter(t => t.status === 'pending');
       return `
-        <div class="p-6 lg:p-10 h-full pb-32 lg:pb-10 scroll-container">
-          <h2 class="text-3xl font-black text-[#0F543C] mb-8 border-b-8 border-[#FFC700] pb-2 inline-block">厨房注文ステータス</h2>
-          <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 max-w-7xl">
+        <div class="p-4 lg:p-10 w-full h-full">
+          <h2 class="text-2xl lg:text-3xl font-black text-[#0F543C] mb-6 lg:mb-8 border-b-8 border-[#FFC700] pb-2 inline-block">厨房注文ステータス</h2>
+          <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-6 max-w-7xl pb-10">
             ${tickets.length === 0 ? `
-              <div class="col-span-full py-20 text-center font-black opacity-20 text-2xl">現在、調理待ちの注文はありません。</div>
+              <div class="col-span-full py-20 text-center font-black opacity-20 text-xl lg:text-2xl">現在、調理待ちの注文はありません。</div>
             ` : 
               tickets.map(t => `
               <div class="bg-white rounded-[32px] border-l-[16px] border-orange-400 border-2 border-gray-100 shadow-xl overflow-hidden flex flex-col transition-all">
@@ -627,7 +645,7 @@
                   `).join('')}
                 </div>
                 <button onclick="window.doneK(${t.id})" class="m-5 py-5 bg-[#0F543C] text-white font-black text-xl rounded-[24px] shadow-lg active:scale-[0.98] transition-all flex items-center justify-center gap-2">
-                  <i data-lucide="check-circle"></i> 調理完了
+                  <i data-lucide="check-circle"></i> 調理完了にする
                 </button>
               </div>
             `).join('')}
@@ -639,16 +657,16 @@
     function getSalesHTML() {
       const total = state.salesRecord.reduce((s, r) => s + r.total, 0);
       return `
-        <div class="p-6 lg:p-10 h-full pb-32 lg:pb-10 max-w-5xl mx-auto w-full scroll-container">
-          <div class="bg-gradient-to-br from-[#0F543C] to-[#146c4d] rounded-[40px] p-10 shadow-2xl mb-10 flex flex-col sm:flex-row justify-between items-center text-white gap-6">
+        <div class="p-4 lg:p-10 max-w-5xl mx-auto w-full h-full pb-10">
+          <div class="bg-gradient-to-br from-[#0F543C] to-[#146c4d] rounded-[40px] p-8 lg:p-10 shadow-2xl mb-8 flex flex-col sm:flex-row justify-between items-center text-white gap-6">
             <div class="text-center sm:text-left">
-              <p class="text-sm font-black opacity-60 mb-2 tracking-widest uppercase">Daily Total Sales</p>
-              <p class="text-6xl font-black">¥${total.toLocaleString()}</p>
+              <p class="text-xs lg:text-sm font-black opacity-60 mb-2 tracking-widest uppercase">Daily Total Sales</p>
+              <p class="text-5xl lg:text-6xl font-black">¥${total.toLocaleString()}</p>
             </div>
             <div class="h-px sm:h-20 w-20 sm:w-px bg-white/20"></div>
             <div class="text-center sm:text-right">
-              <p class="text-sm font-black opacity-60 mb-2 tracking-widest uppercase">Customers</p>
-              <p class="text-4xl font-black">${state.salesRecord.length}組</p>
+              <p class="text-xs lg:text-sm font-black opacity-60 mb-2 tracking-widest uppercase">Customers</p>
+              <p class="text-3xl lg:text-4xl font-black">${state.salesRecord.length}組</p>
             </div>
           </div>
           
@@ -659,15 +677,15 @@
                 <p class="p-20 text-center font-bold text-gray-300">データがまだありません</p>
               ` : 
                 state.salesRecord.map(r => `
-                <div class="p-6 flex justify-between items-start hover:bg-gray-50 transition-all">
+                <div class="p-5 lg:p-6 flex justify-between items-start hover:bg-gray-50 transition-all">
                   <div>
                     <div class="flex items-center gap-3 mb-2">
-                      <span class="font-black text-lg">${formatTime(r.time)}</span>
-                      <span class="text-xs bg-gray-200 text-gray-600 px-3 py-1 rounded-full font-black">Table ${r.table}</span>
+                      <span class="font-black text-base lg:text-lg">${formatTime(r.time)}</span>
+                      <span class="text-[10px] bg-gray-200 text-gray-600 px-3 py-1 rounded-full font-black">Table ${r.table}</span>
                     </div>
-                    <p class="text-sm text-gray-500 leading-relaxed max-w-md">${r.items.map(i => i.item.name + 'x' + i.qty).join(', ')}</p>
+                    <p class="text-xs lg:text-sm text-gray-500 leading-relaxed max-w-md">${r.items.map(i => i.item.name + 'x' + i.qty).join(', ')}</p>
                   </div>
-                  <p class="font-black text-[#0F543C] text-2xl ml-4">¥${r.total.toLocaleString()}</p>
+                  <p class="font-black text-[#0F543C] text-xl lg:text-2xl ml-4">¥${r.total.toLocaleString()}</p>
                 </div>
               `).join('')}
             </div>
@@ -678,26 +696,26 @@
 
     function getMenuHTML() {
       return `
-        <div class="p-6 lg:p-10 h-full pb-32 lg:pb-10 max-w-6xl mx-auto w-full scroll-container">
-          <div class="flex justify-between items-end mb-10">
+        <div class="p-4 lg:p-10 max-w-6xl mx-auto w-full h-full pb-10">
+          <div class="flex flex-col sm:flex-row sm:justify-between sm:items-end gap-4 mb-8">
             <div>
-              <h2 class="text-4xl font-black text-[#0F543C] tracking-tighter">Menu Control</h2>
-              <p class="text-gray-400 font-bold mt-1">商品の登録・編集を行います</p>
+              <h2 class="text-3xl lg:text-4xl font-black text-[#0F543C] tracking-tighter">商品管理</h2>
+              <p class="text-xs lg:text-sm text-gray-400 font-bold mt-1">商品の登録・編集を行います</p>
             </div>
-            <button onclick="state.editingMenu={id:null, name:'', price:1000, category:'ピザ'}; render();" class="bg-[#0F543C] text-white px-8 py-4 rounded-[24px] font-black shadow-xl flex items-center gap-3 hover:scale-105 transition-all">
-              <i data-lucide="plus"></i>商品追加
+            <button onclick="state.editingMenu={id:null, name:'', price:1000, category:'ピザ'}; render();" class="bg-[#0F543C] text-white px-6 py-3 lg:px-8 lg:py-4 rounded-[24px] font-black shadow-xl flex items-center justify-center gap-3 hover:scale-105 active:scale-95 transition-all w-full sm:w-auto">
+              <i data-lucide="plus"></i>新しい商品を追加
             </button>
           </div>
-          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
             ${state.menu.map(m => `
               <div class="bg-white border-2 border-gray-100 rounded-[32px] p-6 flex flex-col justify-between shadow-sm hover:shadow-md transition-shadow">
-                <div class="mb-4">
+                <div class="mb-6">
                   <span class="text-[10px] font-black bg-gray-100 text-gray-400 px-3 py-1 rounded-full uppercase tracking-tighter">${m.category}</span>
-                  <h3 class="font-black text-xl text-gray-800 mt-2 line-clamp-1">${m.name}</h3>
+                  <h3 class="font-black text-xl text-gray-800 mt-3 line-clamp-1">${m.name}</h3>
                   <p class="text-[#0F543C] font-black text-2xl mt-1">¥${m.price.toLocaleString()}</p>
                 </div>
                 <div class="flex gap-2 border-t pt-4 border-gray-50">
-                  <button onclick="state.editingMenu={...state.menu.find(x=>x.id===${m.id})}; render();" class="flex-1 py-3 bg-gray-50 rounded-2xl flex items-center justify-center hover:bg-gray-100 transition-colors"><i data-lucide="pencil" class="w-5 h-5 text-gray-600"></i></button>
+                  <button onclick="state.editingMenu={...state.menu.find(x=>x.id===${m.id})}; render();" class="flex-1 py-3 bg-gray-50 rounded-2xl flex items-center justify-center hover:bg-gray-200 transition-colors"><i data-lucide="pencil" class="w-5 h-5 text-gray-600"></i></button>
                   <button onclick="window.confirmDeleteMenu(${m.id})" class="flex-1 py-3 bg-red-50 rounded-2xl flex items-center justify-center hover:bg-red-100 transition-colors"><i data-lucide="trash-2" class="w-5 h-5 text-red-500"></i></button>
                 </div>
               </div>
@@ -711,41 +729,39 @@
       const isAdmin = currentUser?.email === state.adminEmail;
 
       return `
-        <div class="p-6 lg:p-10 h-full pb-32 lg:pb-10 max-w-4xl mx-auto w-full space-y-10 scroll-container">
+        <div class="p-4 lg:p-10 max-w-4xl mx-auto w-full h-full space-y-8 pb-10">
           
-          <div class="bg-white rounded-[40px] p-8 border-2 border-gray-100 shadow-sm">
-            <h3 class="font-black text-2xl mb-8 flex items-center gap-3 text-[#0F543C]">
-              <i data-lucide="store" class="w-8 h-8"></i>店舗・レシート設定
+          <div class="bg-white rounded-[40px] p-6 lg:p-8 border-2 border-gray-100 shadow-sm">
+            <h3 class="font-black text-xl lg:text-2xl mb-6 flex items-center gap-3 text-[#0F543C]">
+              <i data-lucide="store" class="w-6 h-6 lg:w-8 lg:h-8"></i>店舗情報設定
             </h3>
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 lg:gap-8">
               <div>
-                <label class="text-[11px] font-black text-gray-400 block mb-2 uppercase tracking-widest">Store Name</label>
-                <input type="text" id="s-name" value="${state.storeInfo.name}" class="w-full p-5 bg-gray-50 border-2 border-transparent rounded-[24px] font-black text-lg focus:bg-white focus:border-[#0F543C] outline-none">
+                <label class="text-[10px] lg:text-[11px] font-black text-gray-400 block mb-2 uppercase tracking-widest">店名 (Store Name)</label>
+                <input type="text" id="s-name" value="${state.storeInfo.name}" class="w-full p-4 lg:p-5 bg-gray-50 border-2 border-transparent rounded-[24px] font-black text-base lg:text-lg focus:bg-white focus:border-[#0F543C] outline-none">
               </div>
               <div>
-                <label class="text-[11px] font-black text-gray-400 block mb-2 uppercase tracking-widest">Phone Number</label>
-                <input type="text" id="s-tel" value="${state.storeInfo.tel || ''}" class="w-full p-5 bg-gray-50 border-2 border-transparent rounded-[24px] font-black text-lg focus:bg-white focus:border-[#0F543C] outline-none">
+                <label class="text-[10px] lg:text-[11px] font-black text-gray-400 block mb-2 uppercase tracking-widest">電話番号 (Tel)</label>
+                <input type="text" id="s-tel" value="${state.storeInfo.tel || ''}" class="w-full p-4 lg:p-5 bg-gray-50 border-2 border-transparent rounded-[24px] font-black text-base lg:text-lg focus:bg-white focus:border-[#0F543C] outline-none">
               </div>
               <div class="md:col-span-2">
-                <label class="text-[11px] font-black text-gray-400 block mb-2 uppercase tracking-widest">Address</label>
-                <input type="text" id="s-addr" value="${state.storeInfo.address}" class="w-full p-5 bg-gray-50 border-2 border-transparent rounded-[24px] font-black text-lg focus:bg-white focus:border-[#0F543C] outline-none">
+                <label class="text-[10px] lg:text-[11px] font-black text-gray-400 block mb-2 uppercase tracking-widest">住所 (Address)</label>
+                <input type="text" id="s-addr" value="${state.storeInfo.address}" class="w-full p-4 lg:p-5 bg-gray-50 border-2 border-transparent rounded-[24px] font-black text-base lg:text-lg focus:bg-white focus:border-[#0F543C] outline-none">
               </div>
               <div class="md:col-span-2">
-                <label class="text-[11px] font-black text-gray-400 block mb-2 uppercase tracking-widest">Receipt Footer Message</label>
-                <textarea id="s-msg" rows="3" class="w-full p-5 bg-gray-50 border-2 border-transparent rounded-[24px] font-black text-lg focus:bg-white focus:border-[#0F543C] outline-none">${state.storeInfo.message}</textarea>
+                <label class="text-[10px] lg:text-[11px] font-black text-gray-400 block mb-2 uppercase tracking-widest">レシート下部メッセージ</label>
+                <textarea id="s-msg" rows="3" class="w-full p-4 lg:p-5 bg-gray-50 border-2 border-transparent rounded-[24px] font-black text-base lg:text-lg focus:bg-white focus:border-[#0F543C] outline-none">${state.storeInfo.message}</textarea>
               </div>
-              <button onclick="state.storeInfo.name=document.getElementById('s-name').value; state.storeInfo.address=document.getElementById('s-addr').value; state.storeInfo.tel=document.getElementById('s-tel').value; state.storeInfo.message=document.getElementById('s-msg').value; saveToFirebase(); render();" class="md:col-span-2 py-5 bg-[#0F543C] text-white font-black text-xl rounded-[28px] shadow-xl hover:scale-[1.01] active:scale-95 transition-all">
-                店舗情報をクラウドに保存
+              <button onclick="state.storeInfo.name=document.getElementById('s-name').value; state.storeInfo.address=document.getElementById('s-addr').value; state.storeInfo.tel=document.getElementById('s-tel').value; state.storeInfo.message=document.getElementById('s-msg').value; saveToFirebase(); render();" class="md:col-span-2 py-4 lg:py-5 bg-[#0F543C] text-white font-black text-lg lg:text-xl rounded-[28px] shadow-xl hover:scale-[1.01] active:scale-95 transition-all">
+                保存して全端末に反映
               </button>
             </div>
           </div>
 
           <div class="bg-white rounded-[40px] border-2 border-gray-100 overflow-hidden shadow-sm">
-            <div class="p-8 bg-gray-50 border-b flex justify-between items-center">
-              <h3 class="font-black text-2xl flex items-center gap-3 text-[#0F543C]"><i data-lucide="users"></i>お得意様名簿</h3>
-              <button onclick="state.isCustomerModalOpen=true; render();" class="bg-[#0F543C] text-white px-6 py-3 rounded-[18px] font-black text-sm flex items-center gap-2 shadow-md">
-                <i data-lucide="user-plus" class="w-5 h-5"></i>新規登録
-              </button>
+            <div class="p-6 lg:p-8 bg-gray-50 border-b flex justify-between items-center">
+              <h3 class="font-black text-xl lg:text-2xl flex items-center gap-3 text-[#0F543C]"><i data-lucide="users"></i>お得意様名簿</h3>
+              <button onclick="state.isCustomerModalOpen=true; render();" class="bg-[#0F543C] text-white px-5 py-2.5 rounded-[18px] font-black text-xs flex items-center gap-2 shadow-md active:scale-95 transition-transform"><i data-lucide="user-plus" class="w-4 h-4"></i>新規登録</button>
             </div>
             <div class="divide-y divide-gray-50">
               ${state.customers.length === 0 ? `
@@ -753,7 +769,7 @@
               ` : 
                 state.customers.map(c => `
                 <div class="p-6 flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 hover:bg-gray-50 transition-colors">
-                  <span class="font-black text-2xl text-gray-800">${c.name}</span>
+                  <span class="font-black text-xl text-gray-800">${c.name}</span>
                   <span class="text-sm text-gray-500 font-bold bg-white px-4 py-3 rounded-2xl border-2 border-gray-50 shadow-inner flex-1 max-w-md">${c.note}</span>
                 </div>
               `).join('')}
@@ -761,30 +777,30 @@
           </div>
 
           ${isAdmin ? `
-            <div class="bg-white rounded-[40px] p-8 border-4 border-[#0F543C] shadow-2xl">
-              <h3 class="font-black text-2xl mb-8 flex items-center gap-3 text-[#0F543C]"><i data-lucide="shield-check"></i>メンバー承認管理 (オーナー専用)</h3>
-              <div class="space-y-10">
+            <div class="bg-white rounded-[40px] p-6 lg:p-8 border-4 border-[#0F543C] shadow-2xl">
+              <h3 class="font-black text-xl lg:text-2xl mb-8 flex items-center gap-3 text-[#0F543C]"><i data-lucide="shield-check"></i>メンバー承認管理 (オーナー専用)</h3>
+              <div class="space-y-8">
                 <div>
-                  <p class="text-xs font-black text-orange-500 mb-4 uppercase tracking-widest bg-orange-50 px-3 py-1 rounded-full inline-block">Pending Requests</p>
+                  <p class="text-xs font-black text-orange-500 mb-4 uppercase tracking-widest bg-orange-50 px-3 py-1 rounded-full inline-block">承認待ち</p>
                   <div class="space-y-3">
                     ${state.pendingEmails.length === 0 ? `
                       <p class="py-10 text-center font-bold text-gray-300 bg-gray-50 rounded-[28px] border-2 border-dashed">新規の申請はありません</p>
                     ` : 
                       state.pendingEmails.map(e => `
-                      <div class="flex justify-between items-center p-6 bg-white rounded-[28px] border-2 border-orange-100 shadow-sm">
-                        <span class="font-black text-gray-700">${e}</span>
-                        <button onclick="window.approve('${e}')" class="bg-[#0F543C] text-white px-8 py-3 rounded-2xl font-black shadow-lg">承認する</button>
+                      <div class="flex flex-col sm:flex-row justify-between sm:items-center p-4 lg:p-6 bg-white rounded-[28px] border-2 border-orange-100 shadow-sm gap-4">
+                        <span class="font-black text-gray-700 break-all">${e}</span>
+                        <button onclick="window.approve('${e}')" class="bg-[#0F543C] text-white px-8 py-3 rounded-2xl font-black shadow-lg active:scale-95 transition-transform w-full sm:w-auto">承認する</button>
                       </div>
                     `).join('')}
                   </div>
                 </div>
                 <div>
-                  <p class="text-xs font-black text-gray-400 mb-4 uppercase tracking-widest bg-gray-50 px-3 py-1 rounded-full inline-block">Authorized Members</p>
+                  <p class="text-xs font-black text-gray-400 mb-4 uppercase tracking-widest bg-gray-50 px-3 py-1 rounded-full inline-block">利用許可済みメンバー</p>
                   <div class="space-y-3">
-                    ${state.allowedEmails.map(e => `
-                      <div class="flex justify-between items-center p-6 bg-gray-50/50 rounded-[28px] border border-gray-100">
-                        <span class="font-bold text-gray-500">${e}</span>
-                        <button onclick="window.revoke('${e}')" class="text-red-500 font-black text-xs px-4 py-2 hover:bg-red-50 rounded-xl transition-colors tracking-widest">権限剥奪</button>
+                    ${state.allowedEmails.length === 0 ? '<p class="text-sm text-gray-400 font-bold pl-2">登録されていません</p>' : state.allowedEmails.map(e => `
+                      <div class="flex justify-between items-center p-4 lg:p-6 bg-gray-50/50 rounded-[28px] border border-gray-100">
+                        <span class="font-bold text-gray-500 break-all">${e}</span>
+                        <button onclick="window.revoke('${e}')" class="text-red-500 font-black text-xs px-4 py-2 hover:bg-red-50 rounded-xl transition-colors tracking-widest">権限解除</button>
                       </div>
                     `).join('')}
                   </div>
@@ -793,10 +809,10 @@
             </div>
           ` : ''}
 
-          <div class="bg-gray-100 rounded-[32px] p-8 border-2 border-dashed border-gray-300">
+          <div class="bg-gray-100 rounded-[32px] p-6 lg:p-8 border-2 border-dashed border-gray-300">
             <h3 class="font-black text-xl mb-2">緊急時データ保存</h3>
-            <p class="text-xs font-bold text-gray-400 mb-6 leading-relaxed">クラウドとは別に、現在お店にあるすべてのデータをJSONファイルとしてダウンロード保存できます。</p>
-            <div class="flex gap-4">
+            <p class="text-xs font-bold text-gray-400 mb-6 leading-relaxed">クラウドとは別に、現在お店にあるすべてのデータをJSONファイルとしてダウンロード保存・復元できます。</p>
+            <div class="flex flex-col sm:flex-row gap-4">
               <button onclick="window.exportJSON()" class="flex-1 py-4 bg-white border-2 border-gray-200 rounded-2xl font-black shadow-sm active:scale-95 transition-all flex items-center justify-center gap-2"><i data-lucide="download"></i>JSON保存</button>
               <button onclick="window.triggerImport()" class="flex-1 py-4 bg-white border-2 border-gray-200 rounded-2xl font-black shadow-sm active:scale-95 transition-all flex items-center justify-center gap-2"><i data-lucide="upload"></i>JSON復元</button>
               <input type="file" id="import-input" accept=".json" class="hidden" onchange="window.importJSON(event)">
@@ -815,29 +831,29 @@
         html += `
           <div class="fixed inset-0 z-[300] flex items-center justify-center p-4 bg-black/70 backdrop-blur-md">
             <div class="bg-white rounded-[40px] shadow-2xl max-w-md w-full overflow-hidden border-4 border-[#0F543C]">
-              <div class="p-8 bg-[#F4F7F5] border-b-2 border-gray-100">
+              <div class="p-6 lg:p-8 bg-[#F4F7F5] border-b-2 border-gray-100">
                 <span class="text-[10px] font-black text-gray-400 uppercase tracking-widest">${item.category}</span>
-                <h2 class="text-3xl font-black text-[#111111] mt-1">${item.name}</h2>
+                <h2 class="text-2xl lg:text-3xl font-black text-[#111111] mt-1">${item.name}</h2>
                 <div class="text-[#0F543C] font-black text-xl mt-2">Base: ¥${item.price.toLocaleString()}</div>
               </div>
-              <div class="p-8 space-y-8">
+              <div class="p-6 lg:p-8 space-y-6 lg:space-y-8">
                 <div>
                   <label class="block font-black mb-2 text-gray-700">備考 (抜き/辛め等)</label>
-                  <input type="text" id="c-note" class="w-full p-5 bg-gray-50 border-2 border-transparent rounded-[24px] font-black text-xl outline-none focus:bg-white focus:border-[#0F543C] transition-all" placeholder="例: トマト抜き">
+                  <input type="text" id="c-note" class="w-full p-4 lg:p-5 bg-gray-50 border-2 border-transparent rounded-[24px] font-black text-lg lg:text-xl outline-none focus:bg-white focus:border-[#0F543C] transition-all" placeholder="例: トマト抜き">
                 </div>
                 <div>
                   <label class="block font-black mb-2 text-gray-700">追加料金 (大盛等)</label>
-                  <input type="number" id="c-extra" value="0" class="w-full p-5 bg-gray-50 border-2 border-transparent rounded-[24px] font-black text-xl outline-none focus:bg-white focus:border-[#0F543C] transition-all">
+                  <input type="number" id="c-extra" value="0" class="w-full p-4 lg:p-5 bg-gray-50 border-2 border-transparent rounded-[24px] font-black text-lg lg:text-xl outline-none focus:bg-white focus:border-[#0F543C] transition-all">
                   <div class="flex gap-2 mt-4">
-                    ${[0, 50, 100, 200].map(v => `
-                      <button onclick="window.setExtra(${v})" class="flex-1 py-2 bg-gray-100 rounded-xl font-black text-xs border border-gray-200">+${v}</button>
+                    ${[0, 50, 100, 200, 500].map(v => `
+                      <button onclick="window.setExtra(${v})" class="flex-1 py-2 lg:py-3 bg-gray-100 rounded-xl font-black text-xs border border-gray-200 active:bg-gray-200">+${v}</button>
                     `).join('')}
                   </div>
                 </div>
               </div>
-              <div class="p-6 bg-gray-50 border-t flex gap-4">
-                <button onclick="window.closeCust()" class="flex-1 py-5 bg-white border-2 border-gray-200 rounded-[24px] font-black text-lg shadow-sm">戻る</button>
-                <button onclick="window.addOrderAction()" class="flex-[2] py-5 bg-[#0F543C] text-white rounded-[24px] font-black text-xl shadow-xl active:scale-95 transition-all">追加する</button>
+              <div class="p-4 lg:p-6 bg-gray-50 border-t flex gap-3 lg:gap-4">
+                <button onclick="window.closeCust()" class="flex-1 py-4 lg:py-5 bg-white border-2 border-gray-200 rounded-[28px] font-black text-base lg:text-lg shadow-sm">戻る</button>
+                <button onclick="window.addOrderAction()" class="flex-[2] py-4 lg:py-5 bg-[#0F543C] text-white rounded-[28px] font-black text-lg lg:text-xl shadow-xl active:scale-95 transition-all">追加する</button>
               </div>
             </div>
           </div>
@@ -849,9 +865,9 @@
         const m = state.editingMenu;
         html += `
           <div class="fixed inset-0 z-[300] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
-            <form onsubmit="window.saveMenuAction(event)" class="bg-white rounded-[40px] shadow-2xl max-w-md w-full overflow-hidden border-4 border-[#0F543C]">
-              <div class="p-8 bg-[#F4F7F5] border-b-2 font-black text-2xl">${m.id ? '商品を編集' : '新しい商品'}</div>
-              <div class="p-8 space-y-6">
+            <form onsubmit="window.saveMenuAction(event)" class="bg-white rounded-[40px] shadow-2xl max-w-md w-full overflow-hidden border-4 border-[#0F543C] max-h-[90vh] flex flex-col">
+              <div class="p-6 lg:p-8 bg-[#F4F7F5] border-b-2 font-black text-xl lg:text-2xl shrink-0">${m.id ? '商品を編集' : '新しい商品'}</div>
+              <div class="p-6 lg:p-8 space-y-6 overflow-y-auto">
                 <div>
                   <label class="block font-black mb-1 text-[10px] text-gray-400 uppercase">Product Name</label>
                   <input type="text" id="m-name" value="${m.name||''}" required class="w-full p-4 bg-gray-50 rounded-2xl font-black border-2 border-transparent focus:bg-white focus:border-[#0F543C] outline-none transition-all">
@@ -867,9 +883,9 @@
                   </select>
                 </div>
               </div>
-              <div class="p-6 bg-gray-50 border-t flex gap-4">
-                <button type="button" onclick="state.editingMenu=null; render();" class="flex-1 py-4 bg-white border-2 border-gray-200 rounded-2xl font-black">中止</button>
-                <button type="submit" class="flex-1 py-4 bg-[#0F543C] text-white font-black rounded-2xl shadow-lg">保存する</button>
+              <div class="p-4 lg:p-6 bg-gray-50 border-t flex gap-3 lg:gap-4 shrink-0">
+                <button type="button" onclick="state.editingMenu=null; render();" class="flex-1 py-4 bg-white border-2 border-gray-200 rounded-2xl font-black">キャンセル</button>
+                <button type="submit" class="flex-[2] py-4 bg-[#0F543C] text-white font-black rounded-2xl shadow-lg active:scale-95 transition-all">保存する</button>
               </div>
             </form>
           </div>
@@ -884,7 +900,7 @@
             <div class="bg-white rounded-3xl shadow-2xl max-w-sm w-full p-8 border-4 border-red-500 text-center">
               <i data-lucide="alert-triangle" class="w-16 h-16 text-red-500 mx-auto mb-4"></i>
               <h3 class="text-2xl font-black mb-2">商品を削除</h3>
-              <p class="text-gray-500 font-bold mb-8 leading-relaxed">「${item.name}」を完全に削除しますか？<br><span class="text-xs">この操作は取り消せません。</span></p>
+              <p class="text-gray-500 font-bold mb-8 leading-relaxed">「${item.name}」を完全に削除しますか？<br><span class="text-xs text-red-400 font-black">取り消しはできません。</span></p>
               <div class="flex gap-3">
                 <button onclick="state.deletingMenuId=null; render();" class="flex-1 py-4 bg-gray-100 rounded-2xl font-black">やめる</button>
                 <button onclick="window.executeDeleteMenu()" class="flex-1 py-4 bg-red-500 text-white rounded-2xl font-black shadow-lg">削除する</button>
@@ -899,8 +915,8 @@
         html += `
           <div class="fixed inset-0 z-[300] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
             <div class="bg-white rounded-[40px] shadow-2xl max-w-md w-full overflow-hidden border-4 border-[#0F543C]">
-              <div class="p-8 bg-[#F4F7F5] border-b-2 font-black text-2xl flex items-center gap-2"><i data-lucide="user-plus"></i> お得意様登録</div>
-              <div class="p-8 space-y-6">
+              <div class="p-6 lg:p-8 bg-[#F4F7F5] border-b-2 font-black text-xl lg:text-2xl flex items-center gap-2"><i data-lucide="user-plus"></i> お得意様登録</div>
+              <div class="p-6 lg:p-8 space-y-6">
                 <div>
                   <label class="block font-black mb-1 text-xs text-gray-400">お名前</label>
                   <input type="text" id="cust-name-modal" class="w-full p-4 bg-gray-50 rounded-2xl font-black border-2 border-transparent focus:border-[#0F543C] outline-none" placeholder="例: 山田様">
@@ -910,9 +926,9 @@
                   <textarea id="cust-note-modal" rows="3" class="w-full p-4 bg-gray-50 rounded-2xl font-black border-2 border-transparent focus:border-[#0F543C] outline-none" placeholder="例: 辛いパスタが好み。"></textarea>
                 </div>
               </div>
-              <div class="p-6 bg-gray-50 border-t flex gap-4">
+              <div class="p-4 lg:p-6 bg-gray-50 border-t flex gap-3 lg:gap-4">
                 <button onclick="state.isCustomerModalOpen=false; render();" class="flex-1 py-4 bg-white border-2 border-gray-300 rounded-2xl font-black">キャンセル</button>
-                <button onclick="window.saveCustomerAction()" class="flex-1 py-4 bg-[#0F543C] text-white font-black rounded-2xl shadow-lg">登録する</button>
+                <button onclick="window.saveCustomerAction()" class="flex-[2] py-4 bg-[#0F543C] text-white font-black rounded-2xl shadow-lg active:scale-95 transition-transform">登録する</button>
               </div>
             </div>
           </div>
@@ -923,11 +939,11 @@
       if (state.printContent) {
         const { type, data } = state.printContent;
         html += `
-          <div class="fixed inset-0 z-[400] flex items-center justify-center p-4 bg-black/80">
+          <div class="fixed inset-0 z-[400] flex items-center justify-center p-4 bg-black/85 backdrop-blur-lg">
             <div class="bg-white rounded-[40px] shadow-2xl max-w-sm w-full overflow-hidden flex flex-col max-h-[90vh]">
               <div class="p-5 bg-white border-b flex justify-between items-center shrink-0">
-                <h3 class="font-black text-[#0F543C] flex items-center gap-2"><i data-lucide="printer" class="w-5 h-5"></i>${type==='kitchen'?'厨房伝票':'レシート出力'}</h3>
-                <button onclick="window.closePrintModal()"><i data-lucide="x" class="text-gray-400"></i></button>
+                <h3 class="font-black text-[#0F543C] flex items-center gap-2"><i data-lucide="printer" class="w-5 h-5"></i>${type==='kitchen'?'厨房用出力':'レシート出力'}</h3>
+                <button onclick="window.closePrintModal()" class="p-2 text-gray-300 hover:text-gray-500"><i data-lucide="x"></i></button>
               </div>
               <div class="p-6 overflow-y-auto bg-gray-100 flex-1">
                 <div class="bg-white p-8 shadow-inner mx-auto w-[280px] font-mono text-[10px] leading-tight text-black border border-gray-200">
@@ -937,19 +953,17 @@
                     ${data.items.map(o => `
                       <div class="border-b border-black py-2">
                         <div class="flex justify-between font-black text-base"><span>${o.item.name}</span><span>x ${o.qty}</span></div>
-                        ${o.note ? `<div class="mt-1 font-bold text-[9px] leading-tight">※ ${o.note}</div>` : ''}
+                        ${o.note?`<div class="mt-1 font-bold text-[10px] leading-tight">※ ${o.note}</div>`:''}
                       </div>
                     `).join('')}
                   ` : `
                     <div class="text-center mb-6">
-                      <h2 class="text-lg font-black tracking-tighter">${state.storeInfo.name}</h2>
+                      <h2 class="text-lg font-black tracking-tighter system-name uppercase">${state.storeInfo.name}</h2>
                       <p class="text-[8px] opacity-70">${state.storeInfo.address}</p>
                       <p class="text-[8px] opacity-70">${state.storeInfo.tel || ''}</p>
                     </div>
-                    <div class="flex justify-between mb-4 border-b border-gray-100 pb-1">
-                      <span>卓: ${data.table}</span><span>${formatTime(data.time)}</span>
-                    </div>
-                    <div class="border-y border-dashed border-black py-4 mb-4 space-y-2">
+                    <div class="flex justify-between mb-3 border-b-2 border-gray-50 pb-1"><span>卓: ${data.table}</span><span>${formatTime(data.time)}</span></div>
+                    <div class="border-y-2 border-dashed border-black py-4 mb-4 space-y-2">
                       ${data.items.map(o => `
                         <div>
                           <div class="flex justify-between font-black">
@@ -963,15 +977,15 @@
                     <div class="space-y-1">
                       <div class="flex justify-between"><span>小計</span><span>¥${data.subtotal.toLocaleString()}</span></div>
                       <div class="flex justify-between"><span>消費税 (10%)</span><span>¥${data.tax.toLocaleString()}</span></div>
-                      <div class="flex justify-between font-black text-lg mt-2 pt-2 border-t-2 border-black"><span>合計</span><span>¥${data.total.toLocaleString()}</span></div>
+                      <div class="flex justify-between font-black text-lg mt-3 pt-3 border-t-2 border-black"><span>合計</span><span>¥${data.total.toLocaleString()}</span></div>
                     </div>
                     <p class="text-center mt-10 text-[9px] font-black whitespace-pre-line leading-relaxed italic">${state.storeInfo.message}</p>
                   `}
                 </div>
               </div>
-              <div class="p-6 bg-white border-t flex gap-3">
-                <button onclick="window.closePrintModal()" class="flex-1 py-4 border-2 border-gray-100 rounded-2xl font-black text-gray-400">閉じる</button>
-                <button onclick="window.print(); window.closePrintModal();" class="flex-[2] py-4 bg-[#0F543C] text-white font-black rounded-2xl shadow-xl flex items-center justify-center gap-2 active:scale-95 transition-all"><i data-lucide="printer"></i>今すぐ印刷する</button>
+              <div class="p-6 bg-white border-t flex gap-3 shrink-0">
+                <button onclick="window.closePrintModal()" class="flex-1 py-4 border-2 border-gray-100 rounded-[20px] font-black text-gray-400">閉じる</button>
+                <button onclick="window.print(); window.closePrintModal();" class="flex-[2] py-4 bg-[#0F543C] text-white font-black rounded-[20px] shadow-xl flex items-center justify-center gap-2 active:scale-95 transition-all"><i data-lucide="printer"></i>印刷</button>
               </div>
             </div>
           </div>
@@ -982,21 +996,21 @@
       if (state.isAuditPanelOpen) {
         html += `
           <div class="fixed inset-0 z-[500] flex items-center justify-center p-4 bg-black/80 backdrop-blur-xl">
-            <div class="bg-white rounded-[48px] shadow-2xl max-w-2xl w-full overflow-hidden flex flex-col border-4 border-[#0F543C]">
-              <div class="bg-[#0F543C] p-8 flex justify-between items-center text-white shrink-0">
-                <h2 class="font-black text-2xl flex items-center gap-4"><i data-lucide="shield-check"></i>アクセシビリティ監査パネル</h2>
+            <div class="bg-white rounded-[48px] shadow-2xl max-w-2xl w-full overflow-hidden flex flex-col border-4 border-[#0F543C] max-h-screen">
+              <div class="bg-[#0F543C] p-6 lg:p-8 flex justify-between items-center text-white shrink-0">
+                <h2 class="font-black text-xl lg:text-2xl flex items-center gap-3 lg:gap-4"><i data-lucide="shield-check"></i>アクセシビリティ監査</h2>
                 <button onclick="window.toggleAudit(false)" class="p-2 opacity-50 hover:opacity-100 transition-opacity"><i data-lucide="x"></i></button>
               </div>
-              <div class="p-10 overflow-y-auto flex-1 text-sm leading-loose text-gray-700">
-                <h4 class="font-black text-[#0F543C] border-b-4 border-[#FFC700] inline-block mb-8 text-xl tracking-tight">JIS2016 / WCAG 2.2 AAA 対応</h4>
-                <ul class="space-y-8">
-                  <li class="flex gap-5"><i data-lucide="check-circle" class="text-green-500 shrink-0 w-6 h-6"></i><div><strong class="block text-lg text-gray-900 mb-1">超高コントラスト (AAA達成)</strong>全画面において文字と背景のコントラスト比を7:1以上に設定したUDカラーを採用。</div></li>
-                  <li class="flex gap-5"><i data-lucide="check-circle" class="text-green-500 shrink-0 w-6 h-6"></i><div><strong class="block text-lg text-gray-900 mb-1">指に優しい操作領域 (44px+)</strong>すべてのボタンを指の太さ以上に大きく設計し、押し間違いを最小限に。</div></li>
-                  <li class="flex gap-5"><i data-lucide="check-circle" class="text-green-500 shrink-0 w-6 h-6"></i><div><strong class="block text-lg text-gray-900 mb-1">フォーカスとスクリーンリーダー</strong>キーボード操作の可視化とARIA属性による音声読み上げの最適化を完了。</div></li>
+              <div class="p-6 lg:p-10 overflow-y-auto flex-1 text-sm leading-loose text-gray-700">
+                <h4 class="font-black text-[#0F543C] border-b-4 border-[#FFC700] inline-block mb-6 lg:mb-8 text-lg lg:text-xl tracking-tight">JIS2016 / WCAG 2.2 AAA 対応</h4>
+                <ul class="space-y-6 lg:space-y-8">
+                  <li class="flex gap-4 lg:gap-5"><i data-lucide="check-circle" class="text-green-500 shrink-0 w-6 h-6"></i><div><strong class="block text-base lg:text-lg text-gray-900 mb-1">超高コントラスト (AAA達成)</strong>全画面において文字と背景のコントラスト比を7:1以上に設定したUDカラーを採用。</div></li>
+                  <li class="flex gap-4 lg:gap-5"><i data-lucide="check-circle" class="text-green-500 shrink-0 w-6 h-6"></i><div><strong class="block text-base lg:text-lg text-gray-900 mb-1">指に優しい操作領域 (44px+)</strong>すべてのボタンを指の太さ以上に大きく設計し、押し間違いを最小限に。</div></li>
+                  <li class="flex gap-4 lg:gap-5"><i data-lucide="check-circle" class="text-green-500 shrink-0 w-6 h-6"></i><div><strong class="block text-base lg:text-lg text-gray-900 mb-1">フォーカスとスクリーンリーダー</strong>キーボード操作の可視化とARIA属性による音声読み上げの最適化を完了。</div></li>
                 </ul>
               </div>
-              <div class="p-8 bg-gray-50 border-t flex justify-end">
-                <button onclick="window.toggleAudit(false)" class="px-10 py-4 bg-[#0F543C] text-white font-black rounded-2xl shadow-lg">パネルを閉じる</button>
+              <div class="p-6 lg:p-8 bg-gray-50 border-t flex justify-end shrink-0">
+                <button onclick="window.toggleAudit(false)" class="px-10 py-4 bg-[#0F543C] text-white font-black rounded-2xl shadow-lg active:scale-95 transition-transform">パネルを閉じる</button>
               </div>
             </div>
           </div>
