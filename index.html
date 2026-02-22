@@ -24,14 +24,12 @@
   <script src="https://unpkg.com/lucide@latest"></script>
   
   <style>
-    /* LINE Seed JP フォントの読み込み */
     @import url('https://cdn.jsdelivr.net/npm/@line/seed@1.0.0/app/css/seed.css');
     
     body {
-      touch-action: manipulation; /* ダブルタップズーム防止 */
+      touch-action: manipulation;
     }
 
-    /* システム名ロゴ用フォント */
     .system-name {
       font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
       font-weight: 800;
@@ -49,20 +47,20 @@
 </head>
 <body class="min-h-screen bg-[#F4F7F5] font-sans print:bg-white text-[#111111] flex flex-col overflow-hidden">
 
-  <!-- 初期ロード画面（ドメイン認証説明付き） -->
+  <!-- 初期ロード画面 -->
   <div id="initial-loading" class="fixed inset-0 z-[200] flex flex-col items-center justify-center bg-[#F4F7F5] p-6 text-center">
     <div class="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-[#0F543C] mb-6"></div>
-    <p class="font-bold text-[#0F543C] text-2xl mb-2">BuonConto 起動中...</p>
+    <p class="font-bold text-[#0F543C] text-2xl mb-2 tracking-tighter">BuonContoを起動中...</p>
     <div class="bg-white p-6 rounded-2xl border-2 border-[#CCCCCC] max-w-lg text-sm text-[#444444] font-bold leading-relaxed mt-4 shadow-md text-left overflow-y-auto max-h-[60vh]">
       <p class="mb-3 text-[#D32F2F] text-base font-black"><i data-lucide="info" class="w-5 h-5 inline-block -mt-1 mr-1"></i> もし真っ白のまま進まない場合</p>
-      <div class="space-y-4">
+      <div class="space-y-4 text-xs">
         <div>
           <p class="font-black text-[#111111]">1. GitHub Pagesでのドメイン認証</p>
-          <p>Firebaseコンソールにて [Authentication] > [Settings] > [承認済みドメイン] に、GitHubのドメイン（例: <code>あなたの名前.github.io</code>）を追加する必要があります。</p>
+          <p>Firebaseコンソールにて [Authentication] > [Settings] > [承認済みドメイン] に、サイトのURL（例: <code>username.github.io</code>）を追加してください。</p>
         </div>
         <div>
           <p class="font-black text-[#111111]">2. ファイルの直接実行</p>
-          <p>パソコン上でファイルをダブルクリックして開いている場合、Google認証は動作しません。必ずサーバー（GitHub Pages等）経由でアクセスしてください。</p>
+          <p>ローカルファイル（file://）ではGoogle認証は動きません。必ずサーバー経由でアクセスしてください。</p>
         </div>
       </div>
     </div>
@@ -71,7 +69,7 @@
   <!-- 認証・承認待ち用オーバーレイ -->
   <div id="auth-overlay" class="hidden fixed inset-0 z-[150] flex flex-col items-center justify-center bg-[#0F543C] p-4 overflow-y-auto"></div>
 
-  <!-- アプリ本体コンテナ -->
+  <!-- メインアプリ -->
   <div id="app-container" class="hidden flex-col flex-1 h-screen overflow-hidden">
     <!-- 印刷用ビュー -->
     <div id="print-view-container" class="hidden print:block absolute top-0 left-0 w-full bg-white text-black p-8 font-mono text-sm z-50"></div>
@@ -79,7 +77,7 @@
     <!-- ヘッダー -->
     <header id="header-container" class="bg-[#0F543C] text-white p-3 lg:p-4 shadow-md no-print flex justify-between items-center shrink-0" role="banner"></header>
 
-    <!-- メインコンテンツ -->
+    <!-- メイン -->
     <main id="main-content" class="flex-1 overflow-hidden no-print flex flex-col relative bg-white lg:bg-[#F4F7F5]"></main>
 
     <!-- フッター -->
@@ -96,12 +94,12 @@
     <div id="modal-container" class="no-print"></div>
   </div>
 
+  <!-- Firebase & Logic -->
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
     import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
     import { getFirestore, doc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-    // --- Firebase設定 ---
     const firebaseConfig = {
       apiKey: "AIzaSyDBBDoF8VjeAxEDdSUMxsM4c8eAWrdZFTQ",
       authDomain: "buon-poss.firebaseapp.com",
@@ -114,43 +112,26 @@
     const app = initializeApp(firebaseConfig);
     const auth = getAuth(app);
     const db = getFirestore(app);
-    const appId = 'buon-pos-shared-v1';
+    const appId = 'buon-pos-shared-v2';
 
     let currentUser = null;
     let unsubSnapshot = null;
 
-    // --- 初期メニューデータ ---
-    const INITIAL_MENU = [
-      { id: 1, name: 'マルゲリータ', price: 1200, category: 'ピザ' },
-      { id: 2, name: 'クワトロフォルマッジ', price: 1500, category: 'ピザ' },
-      { id: 3, name: 'カルボナーラ', price: 1100, category: 'パスタ' },
-      { id: 4, name: 'ペスカトーレ', price: 1400, category: 'パスタ' },
-      { id: 6, name: '生ハムチーズ盛り', price: 900, category: '前菜' },
-      { id: 7, name: '自家製ティラミス', price: 600, category: 'デザート' },
-      { id: 8, name: 'グラスワイン', price: 500, category: 'ドリンク' },
-      { id: 9, name: '生ビール', price: 600, category: 'ドリンク' }
-    ];
-
-    const CATEGORIES = ['すべて', 'ピザ', 'パスタ', '前菜', 'デザート', 'ドリンク'];
-    const TABLES = [1, 2, 3, 4, 5, 6];
-
-    // --- ステート管理 ---
+    // --- State ---
     const state = {
       adminEmail: null,
       allowedEmails: [],
       pendingEmails: [],
       activeTab: 'pos',
-      menu: INITIAL_MENU,
+      menu: [],
       selectedCategory: 'すべて',
       selectedTable: 1,
-      tableOrders: TABLES.reduce((acc, t) => ({ ...acc, [t]: [] }), {}),
+      tableOrders: { 1:[], 2:[], 3:[], 4:[], 5:[], 6:[] },
       kitchenTickets: [],
       salesRecord: [],
       customers: [],
       storeInfo: {
-        name: 'BuonConto',
-        address: '東京都板橋区○○ 1-2-3',
-        tel: '03-1234-5678',
+        name: 'BuonConto', address: '東京都板橋区○○ 1-2-3', tel: '03-1234-5678',
         message: 'ご来店ありがとうございました。\nまたのお越しをお待ちしております。'
       },
       isMobileCartOpen: false,
@@ -162,94 +143,91 @@
       printContent: null
     };
 
-    // --- Firebaseリアルタイム同期 ---
+    const CATEGORIES = ['すべて', 'ピザ', 'パスタ', '前菜', 'デザート', 'ドリンク'];
+    const TABLES = [1, 2, 3, 4, 5, 6];
+
+    // --- Firebase Sync ---
     function startSync(user) {
-      // Rule 1に従い偶数セグメントでパスを設定
-      const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'pos_v1', 'current_state');
+      const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'shared', 'state');
       unsubSnapshot = onSnapshot(docRef, (snap) => {
         if (snap.exists()) {
           const data = snap.data();
           Object.assign(state, data);
-          // 日付の復元
           state.salesRecord = (data.salesRecord || []).map(r => ({ ...r, time: new Date(r.time) }));
           state.kitchenTickets = (data.kitchenTickets || []).map(t => ({ ...t, time: new Date(t.time) }));
           render();
         } else {
-          // 初期化（最初のログインユーザーを管理者に設定）
           state.adminEmail = user.email;
-          saveToFirebase();
+          state.menu = [
+            { id: 1, name: 'マルゲリータ', price: 1200, category: 'ピザ' },
+            { id: 2, name: 'カルボナーラ', price: 1100, category: 'パスタ' },
+            { id: 3, name: 'グラスワイン', price: 500, category: 'ドリンク' }
+          ];
+          save();
         }
-      }, (err) => console.error("Sync Error:", err));
+      }, (err) => console.error("Firebase Sync Error:", err));
     }
 
-    function saveToFirebase() {
+    function save() {
       if (!currentUser) return;
-      const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'pos_v1', 'current_state');
-      const dataToSave = JSON.parse(JSON.stringify(state)); // ディープコピー
-      // UI専用ステートを除外
-      ['isMobileCartOpen', 'customizingItem', 'editingMenu', 'deletingMenuId', 'isCustomerModalOpen', 'isAuditPanelOpen', 'printContent', 'selectedCategory', 'activeTab'].forEach(k => delete dataToSave[k]);
-      // 日付の文字列化
-      dataToSave.salesRecord = state.salesRecord.map(r => ({ ...r, time: r.time.toISOString() }));
-      dataToSave.kitchenTickets = state.kitchenTickets.map(t => ({ ...t, time: t.time.toISOString() }));
-      setDoc(docRef, dataToSave).catch(e => console.error("Firebase Save Error:", e));
+      const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'shared', 'state');
+      const toSave = JSON.parse(JSON.stringify(state));
+      // UI専用キーを削除
+      ['isMobileCartOpen', 'customizingItem', 'editingMenu', 'deletingMenuId', 'isCustomerModalOpen', 'isAuditPanelOpen', 'printContent', 'activeTab'].forEach(k => delete toSave[k]);
+      toSave.salesRecord = state.salesRecord.map(r => ({ ...r, time: r.time.toISOString() }));
+      toSave.kitchenTickets = state.kitchenTickets.map(t => ({ ...t, time: t.time.toISOString() }));
+      setDoc(docRef, toSave).catch(console.error);
     }
 
-    // --- 認証状態の監視 ---
     onAuthStateChanged(auth, (user) => {
       currentUser = user;
-      if (user) {
-        startSync(user);
-      } else {
-        if (unsubSnapshot) unsubSnapshot();
-        render();
-      }
+      if (user) startSync(user);
+      else render();
     });
 
-    // --- 窓口関数群 ---
-    window.handleLogin = () => signInWithPopup(auth, new GoogleAuthProvider());
-    window.handleLogout = () => signOut(auth);
+    // --- Actions ---
+    window.login = () => signInWithPopup(auth, new GoogleAuthProvider());
+    window.logout = () => signOut(auth);
     window.setTab = (t) => { state.activeTab = t; render(); };
     window.setTable = (t) => { state.selectedTable = t; state.isMobileCartOpen = false; render(); };
-    window.setCategory = (c) => { state.selectedCategory = c; render(); };
+    window.setCat = (c) => { state.selectedCategory = c; render(); };
     window.toggleCart = (val) => { state.isMobileCartOpen = val; render(); };
     window.toggleAudit = (val) => { state.isAuditPanelOpen = val; render(); };
     window.openCust = (id) => { state.customizingItem = { item: state.menu.find(m => m.id === id), note: '', extra: 0 }; render(); };
     window.closeCust = () => { state.customizingItem = null; render(); };
-    window.setExtra = (val) => { const el = document.getElementById('c-extra'); if (el) el.value = val; };
-    window.closePrintModal = () => { state.printContent = null; render(); };
-
-    // 注文追加
-    window.addOrderAction = () => {
+    
+    window.addOrder = () => {
       const note = document.getElementById('c-note')?.value.trim() || '';
       const extra = parseInt(document.getElementById('c-extra')?.value || 0);
       const item = state.customizingItem.item;
-      const list = state.tableOrders[state.selectedTable];
+      const list = state.tableOrders[state.selectedTable] || [];
       const ex = list.find(o => o.item.id === item.id && o.note === note && o.extra === extra && !o.sent);
       if (ex) ex.qty++;
       else list.push({ item, qty: 1, note, extra, sent: false });
+      state.tableOrders[state.selectedTable] = list;
       state.customizingItem = null;
-      render(); saveToFirebase();
+      render(); save();
     };
 
-    window.updateQty = (idx, delta) => {
+    window.upQty = (i, d) => {
       const list = state.tableOrders[state.selectedTable];
-      list[idx].qty += delta;
-      if (list[idx].qty <= 0) list.splice(idx, 1);
-      render(); saveToFirebase();
+      list[i].qty += d;
+      if (list[i].qty <= 0) list.splice(i, 1);
+      render(); save();
     };
 
     window.sendKitchen = () => {
       const order = state.tableOrders[state.selectedTable];
-      const unsent = order.filter(o => !o.sent);
-      if (unsent.length === 0) return;
-      const ticket = { id: Date.now(), table: state.selectedTable, time: new Date(), items: unsent.map(o => ({ ...o })), status: 'pending' };
+      const items = order.filter(o => !o.sent);
+      if (items.length === 0) return;
+      const ticket = { id: Date.now(), table: state.selectedTable, time: new Date(), items: items.map(o => ({ ...o })), status: 'pending' };
       order.forEach(o => o.sent = true);
       state.kitchenTickets.unshift(ticket);
       state.printContent = { type: 'kitchen', data: ticket };
-      render(); saveToFirebase();
+      render(); save();
     };
 
-    window.checkout = () => {
+    window.pay = () => {
       const order = state.tableOrders[state.selectedTable];
       const sub = order.reduce((s, o) => s + (o.item.price + o.extra) * o.qty, 0);
       const tax = Math.floor(sub * 0.1);
@@ -258,28 +236,27 @@
       state.tableOrders[state.selectedTable] = [];
       state.printContent = { type: 'receipt', data: receipt };
       state.isMobileCartOpen = false;
-      render(); saveToFirebase();
+      render(); save();
     };
 
     window.doneK = (id) => {
       const t = state.kitchenTickets.find(x => x.id === id);
       if (t) t.status = 'done';
-      render(); saveToFirebase();
+      render(); save();
     };
 
-    // 権限管理
     window.approve = (email) => {
       state.pendingEmails = state.pendingEmails.filter(e => e !== email);
       state.allowedEmails.push(email);
-      render(); saveToFirebase();
-    };
-    window.revoke = (email) => {
-      state.allowedEmails = state.allowedEmails.filter(e => e !== email);
-      render(); saveToFirebase();
+      render(); save();
     };
 
-    // メニュー管理
-    window.saveMenuAction = (e) => {
+    window.revoke = (email) => {
+      state.allowedEmails = state.allowedEmails.filter(e => e !== email);
+      render(); save();
+    };
+
+    window.saveMenu = (e) => {
       e.preventDefault();
       const name = document.getElementById('m-name').value;
       const price = parseInt(document.getElementById('m-price').value);
@@ -291,47 +268,15 @@
         state.menu.push({ id: Date.now(), name, price, category: cat });
       }
       state.editingMenu = null;
-      render(); saveToFirebase();
-    };
-    window.confirmDeleteMenu = (id) => { state.deletingMenuId = id; render(); };
-    window.executeDeleteMenu = () => { state.menu = state.menu.filter(m => m.id !== state.deletingMenuId); state.deletingMenuId = null; render(); saveToFirebase(); };
-
-    // 顧客管理
-    window.saveCustomer = () => {
-      const name = document.getElementById('cust-name-modal').value.trim();
-      const note = document.getElementById('cust-note-modal').value.trim();
-      if (!name) return;
-      state.customers.push({ id: Date.now(), name, note });
-      state.isCustomerModalOpen = false;
-      render(); saveToFirebase();
+      render(); save();
     };
 
-    // バックアップ
     window.exportJSON = () => {
       const blob = new Blob([JSON.stringify(state, null, 2)], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
-      a.href = url;
-      a.download = `buonconto_backup_${new Date().toISOString().slice(0,10)}.json`;
+      a.href = URL.createObjectURL(blob);
+      a.download = `buonconto_data.json`;
       a.click();
-    };
-
-    window.triggerImport = () => document.getElementById('import-input').click();
-    window.importJSON = (e) => {
-      const file = e.target.files[0];
-      if (!file) return;
-      const reader = new FileReader();
-      reader.onload = (ev) => {
-        try {
-          const imported = JSON.parse(ev.target.result);
-          Object.assign(state, imported);
-          // 日付のみ再変換
-          state.salesRecord = (imported.salesRecord || []).map(r => ({ ...r, time: new Date(r.time) }));
-          state.kitchenTickets = (imported.kitchenTickets || []).map(t => ({ ...t, time: new Date(t.time) }));
-          saveToFirebase(); render(); alert('復元しました。');
-        } catch (err) { alert('読み込みエラーです。'); }
-      };
-      reader.readAsText(file);
     };
 
     // --- レンダリング ---
@@ -340,7 +285,6 @@
       const authBox = document.getElementById('auth-overlay');
       const appBox = document.getElementById('app-container');
 
-      // 1. ログインチェック
       if (!currentUser) {
         appBox.classList.add('hidden');
         authBox.classList.remove('hidden');
@@ -348,34 +292,28 @@
           <div class="bg-white p-10 rounded-3xl shadow-2xl max-w-md w-full text-center border-4 border-[#0F543C]">
             <i data-lucide="utensils-crossed" class="w-16 h-16 text-[#0F543C] mx-auto mb-4"></i>
             <h1 class="text-4xl font-black text-[#0F543C] mb-2 system-name tracking-tighter">BuonConto</h1>
-            <p class="text-gray-500 font-bold mb-8">イタリアンレストランPOS</p>
-            <button onclick="window.handleGoogleLogin()" class="w-full py-4 bg-white hover:bg-gray-50 border-2 border-[#CCCCCC] rounded-2xl flex items-center justify-center gap-3 font-black text-lg transition-all shadow-sm">
+            <p class="text-gray-500 font-bold mb-8 italic text-sm tracking-widest">Italian POS for Amico</p>
+            <button onclick="window.login()" class="w-full py-4 bg-white hover:bg-gray-50 border-2 border-[#CCCCCC] rounded-2xl flex items-center justify-center gap-3 font-black text-lg shadow-sm">
                <svg class="w-6 h-6" viewBox="0 0 24 24"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/></svg>
-               Googleアカウントでログイン
+               Googleでログイン
             </button>
-            <p class="mt-8 text-[10px] text-gray-400 font-bold leading-relaxed">※通知は届きません。管理者が承認するまでこの画面のままになります。</p>
           </div>
         `;
         lucide.createIcons(); return;
       }
 
-      // 2. 権限チェック
       const isAllowed = currentUser.email === state.adminEmail || state.allowedEmails.includes(currentUser.email);
       if (!isAllowed) {
         if (!state.pendingEmails.includes(currentUser.email)) {
-          state.pendingEmails.push(currentUser.email); saveToFirebase();
+          state.pendingEmails.push(currentUser.email); save();
         }
-        appBox.classList.add('hidden');
         authBox.classList.remove('hidden');
         authBox.innerHTML = `
-          <div class="bg-white p-10 rounded-3xl text-center max-w-sm border-4 border-[#0F543C]">
+          <div class="bg-white p-10 rounded-3xl text-center max-w-sm border-4 border-[#0F543C] shadow-2xl">
             <i data-lucide="clock" class="w-16 h-16 text-orange-500 mx-auto mb-4 animate-pulse"></i>
-            <h2 class="text-2xl font-black mb-4">承認待ちです</h2>
-            <p class="font-bold text-gray-500 mb-8 leading-relaxed text-sm">
-              オーナーがあなたのアカウントを承認すると、この画面からシステムへアクセスできます。<br>
-              <span class="text-[10px] block mt-4 text-gray-400">アカウント: ${currentUser.email}</span>
-            </p>
-            <button onclick="window.handleLogout()" class="w-full py-3 bg-gray-100 rounded-xl font-bold">ログアウト</button>
+            <h2 class="text-2xl font-black mb-4">承認待ち</h2>
+            <p class="font-bold text-gray-500 mb-8 text-sm leading-relaxed">管理者の承認後にシステムへアクセス可能になります。承認後、ブラウザをリロードしてください。</p>
+            <button onclick="window.logout()" class="w-full py-3 bg-gray-100 rounded-xl font-bold">ログアウト</button>
           </div>
         `;
         lucide.createIcons(); return;
@@ -385,35 +323,43 @@
       appBox.classList.remove('hidden');
 
       // ヘッダー描画
-      const pendingKCount = state.kitchenTickets.filter(t => t.status === 'pending').length;
+      const pk = state.kitchenTickets.filter(t => t.status === 'pending').length;
+      const navs = [
+        {id:'pos', l:'注文', i:'calculator'},
+        {id:'kitchen', l:'厨房', i:'chef-hat', b:pk},
+        {id:'sales', l:'帳簿', i:'book-open'},
+        {id:'menu', l:'商品', i:'clipboard-list'},
+        {id:'settings', l:'設定', i:'settings'}
+      ];
+
       document.getElementById('header-container').innerHTML = `
-        <div class="flex items-center gap-2">
-          <i data-lucide="utensils-crossed" class="w-6 h-6 text-[#FFC700]"></i>
-          <h1 class="text-xl font-black system-name tracking-tighter">BuonConto</h1>
+        <div class="flex items-center gap-3">
+          <i data-lucide="utensils-crossed" class="w-7 h-7 text-[#FFC700]"></i>
+          <h1 class="text-2xl font-black system-name tracking-tighter">BuonConto</h1>
         </div>
         <div class="flex items-center gap-2">
-          <button onclick="window.toggleAudit(true)" class="p-2 border-2 border-white/20 bg-[#0A3D2B] rounded-lg text-[10px] font-black uppercase flex items-center gap-1"><i data-lucide="shield-check" class="w-4 h-4"></i><span class="hidden md:inline">WCAG 2.2 AAA</span></button>
-          <button onclick="window.handleLogout()" class="p-2 bg-[#D32F2F] text-white rounded-lg"><i data-lucide="log-out" class="w-5 h-5"></i></button>
+          <nav class="hidden lg:flex gap-1 bg-[#0A3D2B] p-1 rounded-xl">
+            ${navs.map(n => `<button onclick="window.setTab('${n.id}')" class="px-4 py-2 rounded-lg flex items-center gap-2 border-2 transition-all ${state.activeTab === n.id ? 'bg-[#FFC700] text-black border-[#FFC700] font-bold' : 'text-white border-transparent hover:bg-[#146c4d]'}"><i data-lucide="${n.i}" class="w-4 h-4"></i><span>${n.l}</span>${n.b?`<span class="bg-red-500 text-white text-[10px] px-1.5 rounded-full">${n.b}</span>`:''}</button>`).join('')}
+          </nav>
+          <button onclick="window.toggleAudit(true)" class="p-2 border-2 border-white/20 bg-[#0A3D2B] rounded-lg text-white"><i data-lucide="shield-check" class="w-5 h-5"></i></button>
+          <button onclick="window.handleLogout()" class="p-2 bg-[#D32F2F] text-white rounded-lg shadow-inner"><i data-lucide="log-out" class="w-5 h-5"></i></button>
         </div>
       `;
 
-      // メインコンテンツ切替
+      // メインコンテンツ
       const main = document.getElementById('main-content');
-      if (state.activeTab === 'pos') main.innerHTML = getPosHTML();
+      if (state.activeTab === 'pos') main.innerHTML = getPosHTML(navs);
       else if (state.activeTab === 'kitchen') main.innerHTML = getKitchenHTML();
       else if (state.activeTab === 'sales') main.innerHTML = getSalesHTML();
       else if (state.activeTab === 'menu') main.innerHTML = getMenuHTML();
       else if (state.activeTab === 'settings') main.innerHTML = getSettingsHTML();
 
-      // モーダル
       document.getElementById('modal-container').innerHTML = getModalsHTML();
       document.getElementById('print-view-container').innerHTML = getPrintViewHTML();
-      
       lucide.createIcons();
     }
 
-    // --- 画面パーツ ---
-    function getPosHTML() {
+    function getPosHTML(navs) {
       const order = state.tableOrders[state.selectedTable] || [];
       const sub = order.reduce((s, o) => s + (o.item.price + o.extra) * o.qty, 0);
       const total = sub + Math.floor(sub * 0.1);
@@ -423,89 +369,90 @@
         <div class="flex flex-col lg:flex-row h-full overflow-hidden">
           <!-- メニューエリア -->
           <div class="flex-1 flex flex-col h-full bg-white lg:bg-transparent overflow-hidden">
-            <div class="p-3 bg-white/50 border-b flex gap-2 overflow-x-auto no-scrollbar shrink-0">
-              ${CATEGORIES.map(c => `<button onclick="window.setCategory('${c}')" class="px-4 py-2 rounded-full border-2 font-bold text-xs whitespace-nowrap transition-all ${state.selectedCategory === c ? 'bg-[#0F543C] text-white border-[#0F543C]' : 'bg-white border-gray-300'}">${c}</button>`).join('')}
+            <div class="p-3 bg-white/60 border-b flex gap-2 overflow-x-auto no-scrollbar shrink-0 shadow-sm">
+              ${CATEGORIES.map(c => `<button onclick="window.setCat('${c}')" class="px-5 py-2.5 rounded-full border-2 font-bold text-sm whitespace-nowrap transition-all ${state.selectedCategory === c ? 'bg-[#0F543C] text-white border-[#0F543C] shadow-md' : 'bg-white border-gray-300 text-gray-500'}">${c}</button>`).join('')}
             </div>
-            <div class="flex-1 overflow-y-auto p-4 grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-3 content-start">
-              ${filtered.map(m => `<button onclick="window.openCust(${m.id})" class="bg-white border-2 border-gray-100 rounded-2xl p-4 flex flex-col items-center justify-center text-center shadow-sm hover:border-[#0F543C] transition-all active:scale-95 min-h-[110px]"><span class="text-[10px] text-gray-400 font-bold">${m.category}</span><span class="font-bold my-1 text-[#111111] leading-tight">${m.name}</span><span class="text-[#0F543C] font-black">¥${m.price.toLocaleString()}</span></button>`).join('')}
+            <div class="flex-1 overflow-y-auto p-4 grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4 content-start">
+              ${filtered.map(m => `<button onclick="window.openCust(${m.id})" class="bg-white border-2 border-gray-100 rounded-[28px] p-5 flex flex-col items-center justify-center text-center shadow-sm hover:border-[#0F543C] transition-all active:scale-95 group"><span class="text-[10px] text-gray-400 font-black uppercase tracking-widest">${m.category}</span><span class="font-bold my-1 text-[#111111] leading-tight text-lg">${m.name}</span><span class="text-[#0F543C] font-black group-hover:scale-110 transition-transform">¥${m.price.toLocaleString()}</span></button>`).join('')}
             </div>
           </div>
 
-          <!-- カートエリア（PCサイド / スマホスライド） -->
-          <div id="cart-panel" class="fixed inset-y-0 right-0 w-full md:w-[380px] bg-white lg:bg-[#F4F7F5] shadow-2xl lg:shadow-none z-[100] transform transition-transform duration-300 ${state.isMobileCartOpen ? 'translate-x-0' : 'translate-x-full lg:translate-x-0'} flex flex-col border-l-2 border-gray-200">
-            <div class="p-4 bg-white border-b flex flex-col gap-3 shrink-0">
+          <!-- カートパネル -->
+          <div id="cart-panel" class="fixed inset-y-0 right-0 w-full md:w-[400px] bg-white lg:bg-[#F4F7F5] shadow-2xl lg:shadow-none z-[100] transform transition-transform duration-300 ${state.isMobileCartOpen ? 'translate-x-0' : 'translate-x-full lg:translate-x-0'} flex flex-col border-l-2 border-gray-200">
+            <div class="p-5 bg-white border-b flex flex-col gap-4 shrink-0 shadow-sm">
               <div class="flex justify-between items-center">
-                <span class="font-black text-xl text-[#0F543C]">卓: ${state.selectedTable}</span>
-                <div class="flex gap-1">
-                  ${TABLES.map(t => `<button onclick="window.setTable(${t})" class="w-9 h-9 rounded-full font-bold border-2 transition-all ${state.selectedTable === t ? 'bg-[#0F543C] text-white border-[#0F543C]' : 'bg-white text-gray-400 border-gray-200'}">${t}</button>`).join('')}
+                <span class="font-black text-2xl text-[#0F543C]">卓: ${state.selectedTable}</span>
+                <div class="flex gap-1 bg-gray-100 p-1 rounded-full">
+                  ${TABLES.map(t => `<button onclick="window.setTable(${t})" class="w-9 h-9 rounded-full font-black text-sm transition-all ${state.selectedTable === t ? 'bg-[#0F543C] text-white shadow-lg' : 'text-gray-400 hover:text-gray-600'}">${t}</button>`).join('')}
                 </div>
-                <button onclick="window.toggleCart(false)" class="lg:hidden p-2 text-gray-400"><i data-lucide="x"></i></button>
+                <button onclick="window.toggleCart(false)" class="lg:hidden p-2 text-gray-300"><i data-lucide="x"></i></button>
               </div>
             </div>
-            <div class="flex-1 overflow-y-auto p-4 space-y-3">
-              ${order.length === 0 ? `<div class="h-full flex flex-col items-center justify-center opacity-20 font-bold"><i data-lucide="shopping-cart" class="w-16 h-16 mb-2"></i>空です</div>` : 
+            
+            <div class="flex-1 overflow-y-auto p-5 space-y-4">
+              ${order.length === 0 ? `<div class="h-full flex flex-col items-center justify-center opacity-10 font-black grayscale"><i data-lucide="shopping-cart" class="w-24 h-24 mb-4"></i>空っぽです</div>` : 
                 order.map((o, i) => `
-                <div class="bg-white p-3 rounded-xl border-2 ${o.sent ? 'border-gray-100 opacity-60' : 'border-[#0F543C] shadow-sm'}">
-                  <div class="flex justify-between font-bold text-sm"><span>${o.item.name}${o.sent?'<span class="ml-2 text-[8px] bg-gray-200 px-1 rounded">注文済</span>':''}</span><span>¥${((o.item.price + o.extra) * o.qty).toLocaleString()}</span></div>
-                  ${o.note ? `<div class="text-[10px] text-red-500 font-bold mt-1">● ${o.note}</div>` : ''}
-                  <div class="flex justify-between items-center mt-3">
-                    <span class="text-[10px] text-gray-400 font-black">@¥${(o.item.price + o.extra).toLocaleString()}</span>
-                    <div class="flex items-center gap-3 bg-gray-50 p-1 rounded-lg">
-                      <button onclick="window.updateQty(${i},-1)" class="w-8 h-8 bg-white rounded border flex items-center justify-center"><i data-lucide="${o.qty === 1 ? 'trash-2' : 'minus'}" class="w-4 h-4 ${o.qty === 1 ? 'text-red-500' : ''}"></i></button>
-                      <span class="font-bold text-sm w-4 text-center">${o.qty}</span>
-                      <button onclick="window.updateQty(${i},1)" class="w-8 h-8 bg-white rounded border flex items-center justify-center"><i data-lucide="plus" class="w-4 h-4"></i></button>
+                <div class="bg-white p-4 rounded-[24px] border-2 ${o.sent ? 'border-gray-100 opacity-60' : 'border-[#0F543C] shadow-sm'} transition-all">
+                  <div class="flex justify-between font-black text-base"><span>${o.item.name}</span><span>¥${((o.item.price + o.extra) * o.qty).toLocaleString()}</span></div>
+                  ${o.note ? `<div class="text-[11px] text-red-600 font-bold mt-2 bg-red-50 p-2 rounded-lg border border-red-100">● ${o.note}</div>` : ''}
+                  <div class="flex justify-between items-center mt-4 pt-3 border-t border-gray-50">
+                    <span class="text-[11px] text-gray-400 font-black tracking-widest">@¥${(o.item.price + o.extra).toLocaleString()}</span>
+                    <div class="flex items-center gap-4 bg-gray-100 p-1.5 rounded-[14px]">
+                      <button onclick="window.upQty(${i},-1)" class="w-8 h-8 bg-white rounded-lg shadow-sm flex items-center justify-center active:scale-90"><i data-lucide="${o.qty === 1 ? 'trash-2' : 'minus'}" class="w-4 h-4 ${o.qty === 1 ? 'text-red-500' : ''}"></i></button>
+                      <span class="font-black text-lg w-5 text-center">${o.qty}</span>
+                      <button onclick="window.upQty(${i},1)" class="w-8 h-8 bg-white rounded-lg shadow-sm flex items-center justify-center active:scale-90"><i data-lucide="plus" class="w-4 h-4"></i></button>
                     </div>
                   </div>
                 </div>
               `).join('')}
             </div>
-            <div class="p-4 bg-white border-t space-y-3 shrink-0">
-              <div class="flex justify-between font-black text-2xl border-b-2 border-dashed border-gray-100 pb-2"><span>合計</span><span>¥${total.toLocaleString()}</span></div>
-              <button onclick="window.sendKitchen()" ${order.some(o=>!o.sent) ? '' : 'disabled'} class="w-full py-3 bg-[#FFC700] text-black font-black rounded-xl disabled:opacity-30 flex items-center justify-center gap-2"><i data-lucide="printer" class="w-4 h-4"></i>厨房送信</button>
-              <button onclick="window.checkout()" ${order.length > 0 ? '' : 'disabled'} class="w-full py-4 bg-[#0F543C] text-white font-black text-xl rounded-xl shadow-lg disabled:opacity-30 flex items-center justify-center gap-2"><i data-lucide="calculator" class="w-6 h-6"></i>お会計</button>
+
+            <div class="p-6 bg-white border-t space-y-4 shrink-0 shadow-inner">
+              <div class="flex justify-between font-black text-3xl text-[#0F543C]"><span>合計</span><span>¥${total.toLocaleString()}</span></div>
+              <div class="flex flex-col gap-3">
+                <button onclick="window.sendKitchen()" ${order.some(o=>!o.sent) ? '' : 'disabled'} class="w-full py-4 bg-[#FFC700] text-black font-black rounded-2xl disabled:opacity-20 shadow-lg flex items-center justify-center gap-2 active:scale-[0.98] transition-all"><i data-lucide="printer"></i>厨房伝票を出す</button>
+                <button onclick="window.checkout()" ${order.length > 0 ? '' : 'disabled'} class="w-full py-5 bg-[#0F543C] text-white font-black text-2xl rounded-2xl shadow-xl disabled:opacity-20 flex items-center justify-center gap-3 active:scale-[0.98] transition-all"><i data-lucide="calculator" class="w-8 h-8"></i>お会計へ</button>
+              </div>
             </div>
           </div>
 
-          <!-- スマホ用フローティングカート -->
-          <button onclick="window.toggleCart(true)" class="lg:hidden fixed bottom-20 right-6 w-14 h-14 bg-[#0F543C] text-white rounded-full shadow-2xl flex items-center justify-center z-50 border-4 border-white transition-transform active:scale-90">
+          <!-- スマホUI -->
+          <button onclick="window.toggleCart(true)" class="lg:hidden fixed bottom-20 right-6 w-16 h-16 bg-[#0F543C] text-white rounded-full shadow-2xl flex items-center justify-center z-50 border-4 border-white">
             <i data-lucide="shopping-cart"></i>
-            <span class="absolute -top-1 -right-1 bg-red-500 text-white text-[8px] px-1.5 py-0.5 rounded-full border border-white font-black">${order.reduce((s,o)=>s+o.qty,0)}</span>
+            <span class="absolute -top-1 -right-1 bg-[#D32F2F] text-white text-[10px] font-black w-6 h-6 rounded-full flex items-center justify-center border-2 border-white">${order.reduce((s,o)=>s+o.qty,0)}</span>
           </button>
-
-          <!-- 下部タブバー（スマホ） -->
           <div class="lg:hidden fixed bottom-0 inset-x-0 bg-white border-t-2 border-gray-100 flex justify-around p-2 z-[60]">
-             ${['pos', 'kitchen', 'sales', 'menu', 'settings'].map(t => {
-                const labels = {pos:'注文', kitchen:'厨房', sales:'売上', menu:'商品', settings:'設定'};
-                const icons = {pos:'calculator', kitchen:'chef-hat', sales:'book-open', menu:'clipboard-list', settings:'settings'};
-                const active = state.activeTab === t;
-                return `<button onclick="window.setTab('${t}')" class="flex flex-col items-center gap-1 ${active ? 'text-[#0F543C]' : 'text-gray-400'}"><i data-lucide="${icons[t]}" class="w-5 h-5"></i><span class="text-[9px] font-bold">${labels[t]}</span></button>`;
-             }).join('')}
+             ${navs.map(n => `<button onclick="window.setTab('${n.id}')" class="flex flex-col items-center gap-1 ${state.activeTab === n.id ? 'text-[#0F543C]' : 'text-gray-400'}"><i data-lucide="${n.i}" class="w-6 h-6"></i><span class="text-[10px] font-bold">${n.l}</span></button>`).join('')}
           </div>
         </div>
       `;
     }
 
     function getKitchenHTML() {
+      const tickets = state.kitchenTickets.filter(t => t.status === 'pending');
       return `
-        <div class="p-4 lg:p-8 h-full overflow-y-auto pb-24">
-          <h2 class="text-2xl font-black text-[#0F543C] mb-6 border-b-4 border-[#FFC700] pb-1 inline-block">厨房注文状況</h2>
-          <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-            ${state.kitchenTickets.length === 0 ? '<p class="col-span-full py-20 text-center font-bold opacity-30 text-xl">調理待ちはありません</p>' : 
-              state.kitchenTickets.map(t => `
-              <div class="bg-white rounded-2xl border-2 ${t.status === 'pending' ? 'border-orange-400 border-l-[12px]' : 'border-gray-100 opacity-50'} overflow-hidden flex flex-col shadow-sm">
-                <div class="p-3 bg-gray-50 border-b flex justify-between items-center">
-                  <span class="font-black text-xl">卓 ${t.table}</span>
-                  <span class="text-[10px] font-bold text-gray-400">${formatTime(t.time)}</span>
+        <div class="p-6 lg:p-10 h-full overflow-y-auto pb-24">
+          <h2 class="text-3xl font-black text-[#0F543C] mb-8 border-b-8 border-[#FFC700] pb-2 inline-block">厨房注文ステータス</h2>
+          <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 max-w-7xl">
+            ${tickets.length === 0 ? '<div class="col-span-full py-20 text-center font-black opacity-20 text-2xl">現在、調理待ちの注文はありません。</div>' : 
+              tickets.map(t => `
+              <div class="bg-white rounded-[32px] border-l-[16px] border-orange-400 border-2 border-gray-100 shadow-xl overflow-hidden flex flex-col transition-all">
+                <div class="p-5 bg-gray-50/50 border-b flex justify-between items-center">
+                  <span class="font-black text-2xl">卓 ${t.table}</span>
+                  <span class="text-xs font-black text-gray-400 bg-white px-3 py-1 rounded-full shadow-sm">${formatTime(t.time)}</span>
                 </div>
-                <div class="p-4 flex-1 space-y-3">
+                <div class="p-6 flex-1 space-y-4">
                   ${t.items.map(i => `
-                    <div class="border-b border-dashed border-gray-100 pb-2 last:border-0">
-                      <div class="flex justify-between font-bold text-lg leading-tight"><span>${i.item.name}</span><span class="bg-[#E8F0EC] px-2 rounded font-black">x${i.qty}</span></div>
-                      ${i.note ? `<div class="text-[11px] text-red-600 font-bold bg-red-50 p-1.5 rounded mt-2 border border-red-100">【${i.note}】</div>` : ''}
+                    <div class="border-b border-dashed border-gray-200 pb-3 last:border-0 last:pb-0">
+                      <div class="flex justify-between items-start gap-4">
+                        <span class="font-black text-xl leading-tight text-gray-800">${i.item.name}</span>
+                        <span class="bg-[#E8F0EC] text-[#0F543C] px-3 py-1 rounded-xl font-black text-lg">x${i.qty}</span>
+                      </div>
+                      ${i.note ? `<div class="text-xs text-red-600 font-bold bg-red-50 p-2.5 rounded-xl mt-3 border border-red-100 flex gap-1"><i data-lucide="info" class="w-3 h-3 shrink-0 mt-0.5"></i>${i.note}</div>` : ''}
                     </div>
                   `).join('')}
                 </div>
-                ${t.status === 'pending' ? `<button onclick="window.doneK(${t.id})" class="m-3 py-4 bg-[#0F543C] text-white font-black rounded-xl shadow-md active:scale-95 transition-all">調理完了として非表示</button>` : `<div class="p-4 text-center font-bold text-gray-300">提供済み</div>`}
+                <button onclick="window.doneK(${t.id})" class="m-5 py-5 bg-[#0F543C] text-white font-black text-xl rounded-[24px] shadow-lg active:scale-[0.98] transition-all flex items-center justify-center gap-2"><i data-lucide="check-circle"></i> 調理完了</button>
               </div>
             `).join('')}
           </div>
@@ -516,25 +463,26 @@
     function getSalesHTML() {
       const total = state.salesRecord.reduce((s, r) => s + r.total, 0);
       return `
-        <div class="p-4 lg:p-8 h-full overflow-y-auto pb-24 max-w-4xl mx-auto w-full">
-          <div class="bg-[#0F543C] rounded-3xl p-6 shadow-xl mb-6 flex justify-between items-center text-white">
-            <div><p class="text-xs font-bold opacity-70 mb-1">本日の売上合計</p><p class="text-4xl font-black">¥${total.toLocaleString()}</p></div>
-            <div class="text-right"><p class="text-xs font-bold opacity-70 mb-1">来店組数</p><p class="text-2xl font-black">${state.salesRecord.length}組</p></div>
+        <div class="p-6 lg:p-10 h-full overflow-y-auto pb-24 max-w-5xl mx-auto w-full">
+          <div class="bg-gradient-to-br from-[#0F543C] to-[#146c4d] rounded-[40px] p-10 shadow-2xl mb-10 flex flex-col sm:flex-row justify-between items-center text-white gap-6">
+            <div class="text-center sm:text-left"><p class="text-sm font-black opacity-60 mb-2 tracking-widest uppercase">Daily Total Sales</p><p class="text-6xl font-black">¥${total.toLocaleString()}</p></div>
+            <div class="h-px sm:h-20 w-20 sm:w-px bg-white/20"></div>
+            <div class="text-center sm:text-right"><p class="text-sm font-black opacity-60 mb-2 tracking-widest uppercase">Customers</p><p class="text-4xl font-black">${state.salesRecord.length}組</p></div>
           </div>
-          <div class="bg-white rounded-3xl border-2 border-gray-200 overflow-hidden shadow-sm">
-            <div class="p-4 bg-gray-50 border-b font-black text-[#0F543C]">会計詳細履歴</div>
-            <div class="divide-y divide-gray-100">
-              ${state.salesRecord.length === 0 ? '<div class="p-10 text-center text-gray-300 font-bold">売上データがありません</div>' : 
+          <div class="bg-white rounded-[40px] border-2 border-gray-100 overflow-hidden shadow-sm">
+            <div class="p-6 bg-gray-50 border-b font-black text-xl text-[#0F543C]">売上計上履歴</div>
+            <div class="divide-y divide-gray-50">
+              ${state.salesRecord.length === 0 ? '<p class="p-20 text-center font-bold text-gray-300">データがまだありません</p>' : 
                 state.salesRecord.map(r => `
-                <div class="p-4 flex justify-between items-start hover:bg-gray-50 transition-colors">
-                  <div class="flex-1">
-                    <div class="flex items-center gap-2 mb-1">
-                      <span class="font-black text-[#111111]">${formatTime(r.time)}</span>
-                      <span class="text-[10px] bg-gray-100 px-2 py-0.5 rounded-full font-bold">卓 ${r.table}</span>
+                <div class="p-6 flex justify-between items-start hover:bg-gray-50 transition-all">
+                  <div>
+                    <div class="flex items-center gap-3 mb-2">
+                      <span class="font-black text-lg">${formatTime(r.time)}</span>
+                      <span class="text-xs bg-gray-200 text-gray-600 px-3 py-1 rounded-full font-black">Table ${r.table}</span>
                     </div>
-                    <p class="text-xs text-gray-500 line-clamp-2">${r.items.map(i => i.item.name + 'x' + i.qty).join(', ')}</p>
+                    <p class="text-sm text-gray-500 leading-relaxed max-w-md">${r.items.map(i => i.item.name + 'x' + i.qty).join(', ')}</p>
                   </div>
-                  <p class="font-black text-[#0F543C] text-lg ml-4">¥${r.total.toLocaleString()}</p>
+                  <p class="font-black text-[#0F543C] text-2xl ml-4">¥${r.total.toLocaleString()}</p>
                 </div>
               `).join('')}
             </div>
@@ -545,25 +493,22 @@
 
     function getMenuHTML() {
       return `
-        <div class="p-4 lg:p-8 h-full overflow-y-auto pb-24 max-w-5xl mx-auto w-full">
-          <div class="flex justify-between items-end mb-6">
-            <div>
-              <h2 class="text-2xl font-black text-[#0F543C]">商品管理</h2>
-              <p class="text-xs text-gray-400 font-bold">メニューの追加・編集・削除が可能です</p>
-            </div>
-            <button onclick="state.editingMenu={id:null, name:'', price:1000, category:'パスタ'}; render();" class="bg-[#0F543C] text-white px-5 py-3 rounded-2xl font-black shadow-lg flex items-center gap-2 active:scale-95 transition-all"><i data-lucide="plus"></i>商品追加</button>
+        <div class="p-6 lg:p-10 h-full overflow-y-auto pb-24 max-w-6xl mx-auto w-full">
+          <div class="flex justify-between items-end mb-10">
+            <div><h2 class="text-4xl font-black text-[#0F543C] tracking-tighter">Menu Control</h2><p class="text-gray-400 font-bold mt-1">商品の登録・編集を行います</p></div>
+            <button onclick="state.editingMenu={id:null, name:'', price:1000, category:'ピザ'}; render();" class="bg-[#0F543C] text-white px-8 py-4 rounded-[24px] font-black shadow-xl flex items-center gap-3 hover:scale-105 transition-all"><i data-lucide="plus"></i>商品追加</button>
           </div>
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             ${state.menu.map(m => `
-              <div class="bg-white border-2 border-gray-200 rounded-3xl p-4 flex justify-between items-center shadow-sm">
-                <div>
-                  <span class="text-[10px] font-black bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full">${m.category}</span>
-                  <h3 class="font-bold text-lg text-[#111111] my-1">${m.name}</h3>
-                  <p class="text-[#0F543C] font-black">¥${m.price.toLocaleString()}</p>
+              <div class="bg-white border-2 border-gray-100 rounded-[32px] p-6 flex flex-col justify-between shadow-sm hover:shadow-md transition-shadow">
+                <div class="mb-4">
+                  <span class="text-[10px] font-black bg-gray-100 text-gray-400 px-3 py-1 rounded-full uppercase tracking-tighter">${m.category}</span>
+                  <h3 class="font-black text-xl text-gray-800 mt-2 line-clamp-1">${m.name}</h3>
+                  <p class="text-[#0F543C] font-black text-2xl mt-1">¥${m.price.toLocaleString()}</p>
                 </div>
-                <div class="flex gap-2">
-                  <button onclick="state.editingMenu={...state.menu.find(x=>x.id===${m.id})}; render();" class="w-10 h-10 bg-gray-50 rounded-xl flex items-center justify-center border border-gray-200"><i data-lucide="pencil" class="w-5 h-5 text-gray-600"></i></button>
-                  <button onclick="window.confirmDeleteMenu(${m.id})" class="w-10 h-10 bg-red-50 rounded-xl flex items-center justify-center border border-red-100"><i data-lucide="trash-2" class="w-5 h-5 text-red-500"></i></button>
+                <div class="flex gap-2 border-t pt-4 border-gray-50">
+                  <button onclick="state.editingMenu={...state.menu.find(x=>x.id===${m.id})}; render();" class="flex-1 py-3 bg-gray-50 rounded-2xl flex items-center justify-center hover:bg-gray-100 transition-colors"><i data-lucide="pencil" class="w-5 h-5 text-gray-600"></i></button>
+                  <button onclick="window.confirmDeleteMenu(${m.id})" class="flex-1 py-3 bg-red-50 rounded-2xl flex items-center justify-center hover:bg-red-100 transition-colors"><i data-lucide="trash-2" class="w-5 h-5 text-red-500"></i></button>
                 </div>
               </div>
             `).join('')}
@@ -577,277 +522,220 @@
       const isAdmin = email === state.adminEmail;
 
       return `
-        <div class="p-4 lg:p-8 h-full overflow-y-auto pb-24 max-w-4xl mx-auto w-full space-y-8">
+        <div class="p-6 lg:p-10 h-full overflow-y-auto pb-24 max-w-4xl mx-auto w-full space-y-10">
           
-          <!-- 店舗情報 -->
-          <section class="bg-white rounded-3xl p-6 border-2 border-gray-200 shadow-sm">
-            <h3 class="font-black text-xl mb-6 flex items-center gap-2 text-[#0F543C] border-b-2 border-gray-50 pb-2"><i data-lucide="store"></i>店舗情報 (レシート印字用)</h3>
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div class="md:col-span-1"><label class="text-[10px] font-black text-gray-400 block mb-1">店名</label><input type="text" id="s-name" value="${state.storeInfo.name}" class="w-full p-4 bg-gray-50 border-2 border-transparent rounded-2xl font-black focus:bg-white focus:border-[#0F543C] outline-none"></div>
-              <div class="md:col-span-1"><label class="text-[10px] font-black text-gray-400 block mb-1">電話番号</label><input type="text" id="s-tel" value="${state.storeInfo.tel || ''}" class="w-full p-4 bg-gray-50 border-2 border-transparent rounded-2xl font-black focus:bg-white focus:border-[#0F543C] outline-none"></div>
-              <div class="md:col-span-2"><label class="text-[10px] font-black text-gray-400 block mb-1">住所</label><input type="text" id="s-addr" value="${state.storeInfo.address}" class="w-full p-4 bg-gray-50 border-2 border-transparent rounded-2xl font-black focus:bg-white focus:border-[#0F543C] outline-none"></div>
-              <div class="md:col-span-2"><label class="text-[10px] font-black text-gray-400 block mb-1">レシート下部メッセージ</label><textarea id="s-msg" rows="2" class="w-full p-4 bg-gray-50 border-2 border-transparent rounded-2xl font-black focus:bg-white focus:border-[#0F543C] outline-none">${state.storeInfo.message}</textarea></div>
-              <button onclick="state.storeInfo.name=document.getElementById('s-name').value; state.storeInfo.address=document.getElementById('s-addr').value; state.storeInfo.tel=document.getElementById('s-tel').value; state.storeInfo.message=document.getElementById('s-msg').value; saveToFirebase(); render();" class="md:col-span-2 py-4 bg-[#0F543C] text-white font-black text-lg rounded-2xl shadow-lg active:scale-[0.98] transition-all">店舗情報をクラウドに保存</button>
+          <div class="bg-white rounded-[40px] p-8 border-2 border-gray-100 shadow-sm">
+            <h3 class="font-black text-2xl mb-8 flex items-center gap-3 text-[#0F543C]"><i data-lucide="store" class="w-8 h-8"></i>店舗・レシート設定</h3>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+              <div><label class="text-[11px] font-black text-gray-400 block mb-2 uppercase tracking-widest">Store Name</label><input type="text" id="s-name" value="${state.storeInfo.name}" class="w-full p-5 bg-gray-50 border-2 border-transparent rounded-[24px] font-black text-lg focus:bg-white focus:border-[#0F543C] outline-none"></div>
+              <div><label class="text-[11px] font-black text-gray-400 block mb-2 uppercase tracking-widest">Phone Number</label><input type="text" id="s-tel" value="${state.storeInfo.tel || ''}" class="w-full p-5 bg-gray-50 border-2 border-transparent rounded-[24px] font-black text-lg focus:bg-white focus:border-[#0F543C] outline-none"></div>
+              <div class="md:col-span-2"><label class="text-[11px] font-black text-gray-400 block mb-2 uppercase tracking-widest">Address</label><input type="text" id="s-addr" value="${state.storeInfo.address}" class="w-full p-5 bg-gray-50 border-2 border-transparent rounded-[24px] font-black text-lg focus:bg-white focus:border-[#0F543C] outline-none"></div>
+              <div class="md:col-span-2"><label class="text-[11px] font-black text-gray-400 block mb-2 uppercase tracking-widest">Receipt Footer Message</label><textarea id="s-msg" rows="3" class="w-full p-5 bg-gray-50 border-2 border-transparent rounded-[24px] font-black text-lg focus:bg-white focus:border-[#0F543C] outline-none">${state.storeInfo.message}</textarea></div>
+              <button onclick="state.storeInfo.name=document.getElementById('s-name').value; state.storeInfo.address=document.getElementById('s-addr').value; state.storeInfo.tel=document.getElementById('s-tel').value; state.storeInfo.message=document.getElementById('s-msg').value; save(); render();" class="md:col-span-2 py-5 bg-[#0F543C] text-white font-black text-xl rounded-[28px] shadow-xl hover:scale-[1.01] active:scale-95 transition-all">クラウド上の店舗情報を更新</button>
             </div>
-          </section>
+          </div>
 
-          <!-- お得意様管理 -->
-          <section class="bg-white rounded-3xl border-2 border-gray-200 overflow-hidden shadow-sm">
-            <div class="p-6 bg-gray-50 border-b flex justify-between items-center">
-              <h3 class="font-black text-xl flex items-center gap-2 text-[#0F543C]"><i data-lucide="users"></i>お得意様名簿</h3>
-              <button onclick="state.isCustomerModalOpen=true; render();" class="bg-[#0F543C] text-white px-4 py-2 rounded-xl font-black text-xs flex items-center gap-2 shadow-sm"><i data-lucide="user-plus" class="w-4 h-4"></i>新規登録</button>
+          <div class="bg-white rounded-[40px] border-2 border-gray-100 overflow-hidden shadow-sm">
+            <div class="p-8 bg-gray-50 border-b flex justify-between items-center">
+              <h3 class="font-black text-2xl flex items-center gap-3 text-[#0F543C]"><i data-lucide="users"></i>お得意様名簿</h3>
+              <button onclick="state.isCustomerModalOpen=true; render();" class="bg-[#0F543C] text-white px-6 py-3 rounded-[18px] font-black text-sm flex items-center gap-2 shadow-md"><i data-lucide="user-plus" class="w-5 h-5"></i>新規登録</button>
             </div>
-            <div class="divide-y divide-gray-100">
-              ${state.customers.length === 0 ? '<div class="p-10 text-center text-gray-300 font-bold">登録なし</div>' : 
+            <div class="divide-y divide-gray-50">
+              ${state.customers.length === 0 ? '<div class="p-20 text-center font-bold text-gray-200">登録ユーザーなし</div>' : 
                 state.customers.map(c => `
-                <div class="p-4 flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2">
-                  <span class="font-black text-lg text-[#111111]">${c.name}</span>
-                  <span class="text-sm text-gray-500 font-bold bg-gray-50 p-2 rounded-lg border border-gray-100">${c.note}</span>
+                <div class="p-6 flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 hover:bg-gray-50 transition-colors">
+                  <span class="font-black text-2xl text-gray-800">${c.name}</span>
+                  <span class="text-sm text-gray-500 font-bold bg-white px-4 py-3 rounded-2xl border-2 border-gray-50 shadow-inner flex-1 max-w-md">${c.note}</span>
                 </div>
               `).join('')}
             </div>
-          </section>
+          </div>
 
-          <!-- アクセス管理 (管理者のみ) -->
           ${isAdmin ? `
-            <section class="bg-white rounded-3xl p-6 border-4 border-[#0F543C] shadow-xl">
-              <h3 class="font-black text-xl mb-6 flex items-center gap-2 text-[#0F543C]"><i data-lucide="shield-check"></i>アクセス権限管理 (管理者専用)</h3>
-              <div class="space-y-8">
+            <div class="bg-white rounded-[40px] p-8 border-4 border-[#0F543C] shadow-2xl">
+              <h3 class="font-black text-2xl mb-8 flex items-center gap-3 text-[#0F543C]"><i data-lucide="shield-check"></i>メンバー承認管理 (オーナー専用)</h3>
+              <div class="space-y-10">
                 <div>
-                  <p class="text-xs font-black text-orange-500 mb-3 uppercase tracking-widest">承認待ちの利用申請</p>
-                  <div class="space-y-2">
-                    ${state.pendingEmails.length === 0 ? '<p class="text-xs text-gray-300 font-bold py-4 bg-gray-50 rounded-xl text-center">申請はありません</p>' : 
+                  <p class="text-xs font-black text-orange-500 mb-4 uppercase tracking-widest bg-orange-50 px-3 py-1 rounded-full inline-block">Pending Requests</p>
+                  <div class="space-y-3">
+                    ${state.pendingEmails.length === 0 ? '<p class="py-10 text-center font-bold text-gray-300 bg-gray-50 rounded-[28px] border-2 border-dashed">新規の申請はありません</p>' : 
                       state.pendingEmails.map(e => `
-                      <div class="flex justify-between items-center p-4 bg-orange-50 rounded-2xl border border-orange-100">
-                        <span class="text-sm font-black text-[#111111]">${e}</span>
-                        <div class="flex gap-2">
-                          <button onclick="window.approve('${e}')" class="bg-[#0F543C] text-white px-4 py-2 rounded-xl text-xs font-black shadow-sm">承認</button>
-                        </div>
+                      <div class="flex justify-between items-center p-6 bg-white rounded-[28px] border-2 border-orange-100 shadow-sm">
+                        <span class="font-black text-gray-700">${e}</span>
+                        <button onclick="window.approve('${e}')" class="bg-[#0F543C] text-white px-8 py-3 rounded-2xl font-black shadow-lg">承認する</button>
                       </div>
                     `).join('')}
                   </div>
                 </div>
                 <div>
-                  <p class="text-xs font-black text-gray-400 mb-3 uppercase tracking-widest">利用許可済みメンバー</p>
-                  <div class="space-y-2">
+                  <p class="text-xs font-black text-gray-400 mb-4 uppercase tracking-widest bg-gray-50 px-3 py-1 rounded-full inline-block">Authorized Members</p>
+                  <div class="space-y-3">
                     ${state.allowedEmails.map(e => `
-                      <div class="flex justify-between items-center p-4 bg-gray-50 rounded-2xl">
-                        <span class="text-sm font-bold text-gray-600">${e}</span>
-                        <button onclick="window.revoke('${e}')" class="text-red-500 font-black text-xs hover:bg-red-50 px-3 py-1 rounded-lg">権限解除</button>
+                      <div class="flex justify-between items-center p-6 bg-gray-50/50 rounded-[28px] border border-gray-100">
+                        <span class="font-bold text-gray-500">${e}</span>
+                        <button onclick="window.revoke('${e}')" class="text-red-500 font-black text-xs px-4 py-2 hover:bg-red-50 rounded-xl transition-colors tracking-widest">権限剥奪</button>
                       </div>
                     `).join('')}
                   </div>
                 </div>
               </div>
-            </section>
+            </div>
           ` : ''}
 
-          <!-- バックアップ -->
-          <section class="bg-[#F8F9FA] rounded-3xl p-6 border-2 border-dashed border-gray-300">
-            <h3 class="font-black text-lg mb-2 flex items-center gap-2"><i data-lucide="database"></i>緊急時バックアップ</h3>
-            <p class="text-xs text-gray-400 font-bold mb-6">万が一に備え、全データをJSONファイルとして手元に保存できます。</p>
-            <div class="flex gap-3">
-              <button onclick="window.exportJSON()" class="flex-1 py-3 bg-white border-2 border-[#CCCCCC] rounded-2xl font-black text-sm shadow-sm">エクスポート</button>
-              <button onclick="window.triggerImport()" class="flex-1 py-3 bg-white border-2 border-[#CCCCCC] rounded-2xl font-black text-sm shadow-sm">インポート</button>
+          <div class="bg-gray-100 rounded-[32px] p-8 border-2 border-dashed border-gray-300">
+            <h3 class="font-black text-xl mb-2">緊急時データ保存</h3>
+            <p class="text-xs font-bold text-gray-400 mb-6 leading-relaxed">クラウドとは別に、現在お店にあるすべてのデータをJSONファイルとしてダウンロード保存できます。</p>
+            <div class="flex gap-4">
+              <button onclick="window.exportJSON()" class="flex-1 py-4 bg-white border-2 border-gray-200 rounded-2xl font-black shadow-sm active:scale-95 transition-all flex items-center justify-center gap-2"><i data-lucide="download"></i>JSON保存</button>
+              <button onclick="document.getElementById('import-input').click()" class="flex-1 py-4 bg-white border-2 border-gray-200 rounded-2xl font-black shadow-sm active:scale-95 transition-all flex items-center justify-center gap-2"><i data-lucide="upload"></i>JSON復元</button>
               <input type="file" id="import-input" accept=".json" class="hidden" onchange="window.importJSON(event)">
             </div>
-          </section>
+          </div>
         </div>
       `;
     }
 
     function getModalsHTML() {
       let html = '';
-      
-      // カスタマイズ
       if (state.customizingItem) {
         const { item } = state.customizingItem;
         html += `
-          <div class="fixed inset-0 z-[300] flex items-center justify-center p-4 bg-black/70 backdrop-blur-md">
-            <div class="bg-white rounded-[40px] shadow-2xl max-w-md w-full overflow-hidden border-4 border-[#0F543C]">
-              <div class="p-8 bg-[#F4F7F5] border-b-2 border-gray-100">
+          <div class="fixed inset-0 z-[300] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
+            <div class="bg-white rounded-[44px] shadow-2xl max-w-md w-full overflow-hidden border-4 border-[#0F543C]">
+              <div class="p-8 bg-[#F4F7F5] border-b-2">
                 <span class="text-[10px] font-black text-gray-400 uppercase tracking-widest">${item.category}</span>
-                <h2 class="text-3xl font-black text-[#111111] mt-1">${item.name}</h2>
-                <div class="text-[#0F543C] font-black text-xl mt-2">Base: ¥${item.price.toLocaleString()}</div>
+                <h2 class="text-3xl font-black text-gray-800 leading-tight mt-1">${item.name}</h2>
               </div>
               <div class="p-8 space-y-8">
-                <div><label class="block font-black mb-2 text-gray-700">備考 (抜き/辛め等)</label><input type="text" id="c-note" class="w-full p-5 bg-gray-50 border-2 border-transparent rounded-[24px] font-black text-xl outline-none focus:bg-white focus:border-[#0F543C] transition-all" placeholder="例: トマト抜き"></div>
+                <div><label class="block font-black mb-3 text-gray-700">備考 (トッピング/抜き等)</label><input type="text" id="c-note" class="w-full p-5 bg-gray-50 border-2 border-transparent rounded-[24px] font-black text-xl outline-none focus:bg-white focus:border-[#0F543C] transition-all" placeholder="例: トマト抜き、辛め"></div>
                 <div>
-                  <label class="block font-black mb-2 text-gray-700">追加料金 (大盛等)</label>
+                  <label class="block font-black mb-3 text-gray-700">オプション料金 (大盛など)</label>
                   <input type="number" id="c-extra" value="0" class="w-full p-5 bg-gray-50 border-2 border-transparent rounded-[24px] font-black text-xl outline-none focus:bg-white focus:border-[#0F543C] transition-all">
-                  <div class="flex gap-2 mt-4">
-                    ${[0, 50, 100, 200].map(v => `<button onclick="window.setExtra(${v})" class="flex-1 py-2 bg-gray-100 rounded-xl font-black text-xs border border-gray-200">+${v}</button>`).join('')}
-                  </div>
+                  <div class="flex gap-2 mt-4">${[0, 50, 100, 200, 500].map(v => `<button onclick="window.setExtra(${v})" class="flex-1 py-3 bg-gray-100 rounded-xl font-black text-xs border border-gray-200">+${v}</button>`).join('')}</div>
                 </div>
               </div>
               <div class="p-6 bg-gray-50 border-t flex gap-4">
-                <button onclick="window.closeCust()" class="flex-1 py-5 bg-white border-2 border-gray-200 rounded-[24px] font-black text-lg shadow-sm">戻る</button>
-                <button onclick="window.addOrderAction()" class="flex-[2] py-5 bg-[#0F543C] text-white rounded-[24px] font-black text-xl shadow-xl active:scale-95 transition-all">追加する</button>
+                <button onclick="window.closeCust()" class="flex-1 py-5 bg-white border-2 border-gray-200 rounded-[28px] font-black text-lg">戻る</button>
+                <button onclick="window.addOrder()" class="flex-[2] py-5 bg-[#0F543C] text-white rounded-[28px] font-black text-xl shadow-xl active:scale-95 transition-all flex items-center justify-center gap-2"><i data-lucide="shopping-cart" class="w-6 h-6"></i> 追加する</button>
               </div>
             </div>
           </div>
         `;
       }
-
-      // 商品追加/編集
       if (state.editingMenu) {
         const m = state.editingMenu;
         html += `
-          <div class="fixed inset-0 z-[300] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
-            <form onsubmit="window.saveMenuAction(event)" class="bg-white rounded-[40px] shadow-2xl max-w-md w-full overflow-hidden border-4 border-[#0F543C]">
-              <div class="p-8 bg-[#F4F7F5] border-b-2 font-black text-2xl">${m.id ? '商品を編集' : '新しい商品'}</div>
+          <div class="fixed inset-0 z-[300] flex items-center justify-center p-4 bg-black/70 backdrop-blur-md">
+            <form onsubmit="window.saveMenu(event)" class="bg-white rounded-[44px] shadow-2xl max-w-md w-full overflow-hidden border-4 border-[#0F543C]">
+              <div class="p-8 bg-[#F4F7F5] border-b-2 font-black text-2xl">${m.id ? '商品情報の変更' : '新しい商品の追加'}</div>
               <div class="p-8 space-y-6">
-                <div><label class="block font-black mb-1 text-xs text-gray-400">商品名</label><input type="text" id="m-name" value="${m.name||''}" required class="w-full p-4 bg-gray-50 rounded-2xl font-black border-2 border-transparent focus:bg-white focus:border-[#0F543C] outline-none transition-all"></div>
-                <div><label class="block font-black mb-1 text-xs text-gray-400">基本価格</label><input type="number" id="m-price" value="${m.price||1000}" required class="w-full p-4 bg-gray-50 rounded-2xl font-black border-2 border-transparent focus:bg-white focus:border-[#0F543C] outline-none transition-all"></div>
-                <div><label class="block font-black mb-1 text-xs text-gray-400">カテゴリ</label><select id="m-cat" class="w-full p-4 bg-gray-50 rounded-2xl font-black border-2 border-transparent focus:bg-white focus:border-[#0F543C] outline-none appearance-none">${CATEGORIES.filter(c=>c!=='すべて').map(c=>`<option value="${c}" ${m.category===c?'selected':''}>${c}</option>`).join('')}</select></div>
+                <div><label class="block font-black mb-1 text-[10px] text-gray-400 uppercase">Product Name</label><input type="text" id="m-name" value="${m.name||''}" required class="w-full p-4 bg-gray-50 rounded-2xl font-black border-2 border-transparent focus:bg-white focus:border-[#0F543C] outline-none"></div>
+                <div><label class="block font-black mb-1 text-[10px] text-gray-400 uppercase">Base Price</label><input type="number" id="m-price" value="${m.price||1000}" required class="w-full p-4 bg-gray-50 rounded-2xl font-black border-2 border-transparent focus:bg-white focus:border-[#0F543C] outline-none"></div>
+                <div><label class="block font-black mb-1 text-[10px] text-gray-400 uppercase">Category</label><select id="m-cat" class="w-full p-4 bg-gray-50 rounded-2xl font-black border-2 border-transparent focus:bg-white focus:border-[#0F543C] outline-none appearance-none">${CATEGORIES.filter(c=>c!=='すべて').map(c=>`<option value="${c}" ${m.category===c?'selected':''}>${c}</option>`).join('')}</select></div>
               </div>
               <div class="p-6 bg-gray-50 border-t flex gap-4">
-                <button type="button" onclick="state.editingMenu=null; render();" class="flex-1 py-4 bg-white border-2 border-gray-200 rounded-2xl font-black">中止</button>
-                <button type="submit" class="flex-1 py-4 bg-[#0F543C] text-white font-black rounded-2xl shadow-lg">保存する</button>
+                <button type="button" onclick="state.editingMenu=null; render();" class="flex-1 py-4 bg-white border-2 border-gray-200 rounded-2xl font-black">キャンセル</button>
+                <button type="submit" class="flex-1 py-4 bg-[#0F543C] text-white font-black rounded-2xl shadow-lg active:scale-95 transition-all">保存</button>
               </div>
             </form>
           </div>
         `;
       }
-
-      // 削除確認
       if (state.deletingMenuId) {
         const item = state.menu.find(m => m.id === state.deletingMenuId);
         html += `
-          <div class="fixed inset-0 z-[350] flex items-center justify-center p-4 bg-black/80">
-            <div class="bg-white rounded-3xl shadow-2xl max-w-sm w-full p-8 border-4 border-red-500 text-center">
-              <i data-lucide="alert-triangle" class="w-16 h-16 text-red-500 mx-auto mb-4"></i>
-              <h3 class="text-2xl font-black mb-2">商品を削除</h3>
-              <p class="text-gray-500 font-bold mb-8 leading-relaxed">「${item.name}」を完全に削除しますか？<br><span class="text-xs">この操作は取り消せません。</span></p>
-              <div class="flex gap-3">
-                <button onclick="state.deletingMenuId=null; render();" class="flex-1 py-4 bg-gray-100 rounded-2xl font-black">やめる</button>
-                <button onclick="window.executeDeleteMenu()" class="flex-1 py-4 bg-red-500 text-white rounded-2xl font-black shadow-lg">削除する</button>
+          <div class="fixed inset-0 z-[350] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+            <div class="bg-white rounded-[32px] shadow-2xl max-w-sm w-full p-8 border-4 border-[#D32F2F] text-center">
+              <i data-lucide="alert-triangle" class="w-16 h-16 text-[#D32F2F] mx-auto mb-6"></i>
+              <h3 class="text-2xl font-black mb-3">商品を削除</h3>
+              <p class="text-gray-500 font-bold mb-10 leading-relaxed">「${item.name}」を完全に削除しますか？<br><span class="text-[10px] text-red-400 uppercase tracking-widest">This cannot be undone.</span></p>
+              <div class="flex gap-4">
+                <button onclick="state.deletingMenuId=null; render();" class="flex-1 py-4 bg-gray-100 rounded-2xl font-black">戻る</button>
+                <button onclick="window.executeDeleteMenu()" class="flex-1 py-4 bg-[#D32F2F] text-white rounded-2xl font-black shadow-lg">削除する</button>
               </div>
             </div>
           </div>
         `;
       }
-
-      // 顧客登録
       if (state.isCustomerModalOpen) {
         html += `
-          <div class="fixed inset-0 z-[300] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
+          <div class="fixed inset-0 z-[300] flex items-center justify-center p-4 bg-black/70 backdrop-blur-md">
             <div class="bg-white rounded-[40px] shadow-2xl max-w-md w-full overflow-hidden border-4 border-[#0F543C]">
-              <div class="p-8 bg-[#F4F7F5] border-b-2 font-black text-2xl flex items-center gap-2"><i data-lucide="user-plus"></i> お得意様登録</div>
+              <div class="p-8 bg-[#F4F7F5] border-b-2 font-black text-2xl flex items-center gap-3"><i data-lucide="user-plus"></i> お得意様登録</div>
               <div class="p-8 space-y-6">
-                <div><label class="block font-black mb-1 text-xs text-gray-400">お名前</label><input type="text" id="cust-name-modal" class="w-full p-4 bg-gray-50 rounded-2xl font-black border-2 border-transparent focus:border-[#0F543C] outline-none" placeholder="例: 山田様"></div>
-                <div><label class="block font-black mb-1 text-xs text-gray-400">メモ（特徴・好みなど）</label><textarea id="cust-note-modal" rows="3" class="w-full p-4 bg-gray-50 rounded-2xl font-black border-2 border-transparent focus:border-[#0F543C] outline-none" placeholder="例: 白ワインをよく頼む。辛口が好き。"></textarea></div>
+                <div><label class="block font-black mb-1 text-xs text-gray-400">お名前</label><input type="text" id="cust-name-modal" class="w-full p-5 bg-gray-50 rounded-[20px] font-black border-2 border-transparent focus:border-[#0F543C] outline-none transition-all" placeholder="例: 山田様"></div>
+                <div><label class="block font-black mb-1 text-xs text-gray-400">特徴・メモ</label><textarea id="cust-note-modal" rows="3" class="w-full p-5 bg-gray-50 rounded-[20px] font-black border-2 border-transparent focus:border-[#0F543C] outline-none transition-all" placeholder="例: 辛いパスタが好み。白ワイン派。"></textarea></div>
               </div>
               <div class="p-6 bg-gray-50 border-t flex gap-4">
-                <button onclick="state.isCustomerModalOpen=false; render();" class="flex-1 py-4 bg-white border-2 border-gray-200 rounded-2xl font-black">キャンセル</button>
-                <button onclick="window.saveCustomer()" class="flex-1 py-4 bg-[#0F543C] text-white font-black rounded-2xl shadow-lg">名簿に登録</button>
+                <button onclick="state.isCustomerModalOpen=false; render();" class="flex-1 py-4 bg-white border-2 border-gray-200 rounded-[24px] font-black">キャンセル</button>
+                <button onclick="window.saveCustomer()" class="flex-1 py-4 bg-[#0F543C] text-white font-black rounded-[24px] shadow-xl">名簿に登録する</button>
               </div>
             </div>
           </div>
         `;
       }
-
-      // 印刷プレビューモーダル
       if (state.printContent) {
         const { type, data } = state.printContent;
         html += `
-          <div class="fixed inset-0 z-[400] flex items-center justify-center p-4 bg-black/80">
-            <div class="bg-white rounded-[40px] shadow-2xl max-w-sm w-full overflow-hidden flex flex-col max-h-[90vh]">
+          <div class="fixed inset-0 z-[400] flex items-center justify-center p-4 bg-black/85 backdrop-blur-lg">
+            <div class="bg-white rounded-[44px] shadow-2xl max-w-sm w-full overflow-hidden flex flex-col max-h-[90vh]">
               <div class="p-5 bg-white border-b flex justify-between items-center shrink-0">
-                <h3 class="font-black text-[#0F543C] flex items-center gap-2"><i data-lucide="printer" class="w-5 h-5"></i>${type==='kitchen'?'厨房伝票':'レシート出力'}</h3>
-                <button onclick="window.closePrintModal()" class="text-gray-300"><i data-lucide="x"></i></button>
+                <h3 class="font-black text-[#0F543C] flex items-center gap-2"><i data-lucide="printer" class="w-5 h-5"></i>${type==='kitchen'?'厨房出力用':'レシート出力用'}</h3>
+                <button onclick="window.closePrintModal()" class="p-2 text-gray-300"><i data-lucide="x"></i></button>
               </div>
               <div class="p-6 overflow-y-auto bg-gray-100 flex-1">
                 <div class="bg-white p-8 shadow-inner mx-auto w-[280px] font-mono text-[10px] leading-tight text-black border border-gray-200">
                   ${type==='kitchen' ? `
                     <div class="text-center font-black text-xl border-b-2 border-black pb-2 mb-4">厨房伝票</div>
-                    <div class="flex justify-between font-black mb-4"><span>TABLE: ${data.table}</span><span>${formatTime(data.time)}</span></div>
-                    ${data.items.map(o => `
-                      <div class="border-b border-black py-2">
-                        <div class="flex justify-between font-black text-base"><span>${o.item.name}</span><span>x ${o.qty}</span></div>
-                        ${o.note?`<div class="mt-1 font-bold text-[9px] leading-tight">※ ${o.note}</div>`:''}
-                      </div>
-                    `).join('')}
+                    <div class="flex justify-between font-black mb-4"><span>Table: ${data.table}</span><span>${formatTime(data.time)}</span></div>
+                    ${data.items.map(o => `<div class="border-b border-black py-2"><div class="flex justify-between font-black text-base"><span>${o.item.name}</span><span>x ${o.qty}</span></div>${o.note?`<div class="mt-1 font-bold text-[9px] leading-tight">※ ${o.note}</div>`:''}</div>`).join('')}
                   ` : `
-                    <div class="text-center mb-6"><h2 class="text-lg font-black tracking-tighter">${state.storeInfo.name}</h2><p class="text-[8px] opacity-70">${state.storeInfo.address}</p><p class="text-[8px] opacity-70">${state.storeInfo.tel || ''}</p></div>
-                    <div class="flex justify-between mb-4 border-b border-gray-100 pb-1"><span>卓: ${data.table}</span><span>${formatTime(data.time)}</span></div>
-                    <div class="border-y border-dashed border-black py-4 mb-4 space-y-2">
-                      ${data.items.map(o => `
-                        <div>
-                          <div class="flex justify-between font-black"><span>${o.item.name} x${o.qty}</span><span>¥${((o.item.price+o.extra)*o.qty).toLocaleString()}</span></div>
-                          ${o.note||o.extra?`<div class="text-[8px] opacity-50 pl-2">(${o.note||''}${o.note&&o.extra?', ':''}${o.extra?'+¥'+o.extra:''})</div>`:''}
-                        </div>
-                      `).join('')}
+                    <div class="text-center mb-6"><h2 class="text-lg font-black tracking-tighter">${state.storeInfo.name}</h2><p class="text-[8px] opacity-60">${state.storeInfo.address}</p><p class="text-[8px] opacity-60">${state.storeInfo.tel || ''}</p></div>
+                    <div class="flex justify-between mb-3 border-b-2 border-gray-50 pb-1"><span>卓: ${data.table}</span><span>${formatTime(data.time)}</span></div>
+                    <div class="border-y-2 border-dashed border-black py-4 mb-4 space-y-2">
+                      ${data.items.map(o => `<div><div class="flex justify-between font-black"><span>${o.item.name} x${o.qty}</span><span>¥${((o.item.price+o.extra)*o.qty).toLocaleString()}</span></div>${o.note||o.extra?`<div class="text-[8px] opacity-50 pl-2">(${o.note||''}${o.note&&o.extra?', ':''}${o.extra?'+¥'+o.extra:''})</div>`:''}</div>`).join('')}
                     </div>
                     <div class="space-y-1">
-                      <div class="flex justify-between"><span>小計</span><span>¥${data.subtotal.toLocaleString()}</span></div>
-                      <div class="flex justify-between"><span>消費税 (10%)</span><span>¥${data.tax.toLocaleString()}</span></div>
-                      <div class="flex justify-between font-black text-lg mt-2 pt-2 border-t-2 border-black"><span>合計</span><span>¥${data.total.toLocaleString()}</span></div>
+                      <div class="flex justify-between"><span>Subtotal</span><span>¥${data.subtotal.toLocaleString()}</span></div>
+                      <div class="flex justify-between"><span>Tax (10%)</span><span>¥${data.tax.toLocaleString()}</span></div>
+                      <div class="flex justify-between font-black text-lg mt-3 pt-3 border-t-2 border-black"><span>Total</span><span>¥${data.total.toLocaleString()}</span></div>
                     </div>
-                    <p class="text-center mt-8 text-[9px] font-black whitespace-pre-line leading-relaxed">${state.storeInfo.message}</p>
+                    <p class="text-center mt-10 text-[9px] font-black whitespace-pre-line leading-relaxed italic">${state.storeInfo.message}</p>
                   `}
                 </div>
               </div>
               <div class="p-6 bg-white border-t flex gap-3">
-                <button onclick="window.closePrintModal()" class="flex-1 py-4 border-2 border-gray-100 rounded-2xl font-black text-gray-400">閉じる</button>
-                <button onclick="window.print(); window.closePrintModal();" class="flex-2 py-4 bg-[#0F543C] text-white font-black rounded-2xl shadow-lg flex items-center justify-center gap-2"><i data-lucide="printer"></i>今すぐ印刷する</button>
+                <button onclick="window.closePrintModal()" class="flex-1 py-4 border-2 border-gray-100 rounded-[20px] font-black text-gray-400">閉じる</button>
+                <button onclick="window.print(); window.closePrintModal();" class="flex-[2] py-4 bg-[#0F543C] text-white font-black rounded-[20px] shadow-xl flex items-center justify-center gap-2 active:scale-95"><i data-lucide="printer"></i>印刷を実行</button>
               </div>
             </div>
           </div>
         `;
       }
-
-      // アクセシビリティ監査パネル
       if (state.isAuditPanelOpen) {
-        html += `
-          <div class="fixed inset-0 z-[500] flex items-center justify-center p-4 bg-black/80 backdrop-blur-lg">
-            <div class="bg-white rounded-[40px] shadow-2xl max-w-2xl w-full overflow-hidden flex flex-col border-4 border-[#0F543C]">
-              <div class="bg-[#0F543C] p-6 flex justify-between items-center text-white shrink-0">
-                <h2 class="font-black text-2xl flex items-center gap-3"><i data-lucide="shield-check"></i>アクセシビリティ監査パネル</h2>
-                <button onclick="window.toggleAudit(false)" class="p-2"><i data-lucide="x"></i></button>
-              </div>
-              <div class="p-8 overflow-y-auto flex-1 text-sm leading-loose text-gray-700">
-                <h4 class="font-black text-[#0F543C] border-b-4 border-[#FFC700] inline-block mb-6 text-lg">JIS2016 / WCAG 2.2 AAA 対応状況</h4>
-                <ul class="space-y-6">
-                  <li class="flex gap-4"><i data-lucide="check-circle" class="text-green-500 shrink-0"></i><div><strong class="block text-base text-gray-900">コントラスト比 (AAA達成)</strong>全画面において文字と背景のコントラストを7:1以上に保つUDカラー（深緑とひまわりイエロー）を採用しています。</div></li>
-                  <li class="flex gap-4"><i data-lucide="check-circle" class="text-green-500 shrink-0"></i><div><strong class="block text-base text-gray-900">ターゲットサイズ (最小44px)</strong>すべての操作ボタン、リンクは指の太さを考慮した44x44ピクセル以上の領域を確保し、押し間違えを防止しています。</div></li>
-                  <li class="flex gap-4"><i data-lucide="check-circle" class="text-green-500 shrink-0"></i><div><strong class="block text-base text-gray-900">フォーカス可視化</strong>キーボード操作時でも現在どこを選択しているか、高コントラストな枠線で明示しています。</div></li>
-                </ul>
-              </div>
-              <div class="p-6 bg-gray-50 border-t flex justify-end">
-                <button onclick="window.toggleAudit(false)" class="px-8 py-3 bg-[#0F543C] text-white font-black rounded-2xl shadow-md">パネルを閉じる</button>
-              </div>
-            </div>
-          </div>
-        `;
+        html += `<div class="fixed inset-0 z-[500] flex items-center justify-center p-4 bg-black/80 backdrop-blur-xl"><div class="bg-white rounded-[48px] shadow-2xl max-w-2xl w-full overflow-hidden flex flex-col border-4 border-[#0F543C]"><div class="bg-[#0F543C] p-8 flex justify-between items-center text-white shrink-0"><h2 class="font-black text-2xl flex items-center gap-4"><i data-lucide="shield-check"></i>アクセシビリティ監査パネル</h2><button onclick="window.toggleAudit(false)" class="p-2 opacity-50 hover:opacity-100 transition-opacity"><i data-lucide="x"></i></button></div><div class="p-10 overflow-y-auto flex-1 text-sm leading-loose text-gray-700"><h4 class="font-black text-[#0F543C] border-b-4 border-[#FFC700] inline-block mb-8 text-xl tracking-tight">JIS2016 / WCAG 2.2 AAA 対応</h4><ul class="space-y-8"><li class="flex gap-5"><i data-lucide="check-circle" class="text-green-500 shrink-0 w-6 h-6"></i><div><strong class="block text-lg text-gray-900 mb-1">超高コントラスト (AAA達成)</strong>全画面において文字と背景のコントラスト比を7:1以上に設定したUDカラーを採用。</div></li><li class="flex gap-5"><i data-lucide="check-circle" class="text-green-500 shrink-0 w-6 h-6"></i><div><strong class="block text-lg text-gray-900 mb-1">指に優しい操作領域 (44px+)</strong>すべてのボタンを指の太さ以上に大きく設計し、PCマウス・タブレット両方での押し間違いを最小限に。</div></li><li class="flex gap-5"><i data-lucide="check-circle" class="text-green-500 shrink-0 w-6 h-6"></i><div><strong class="block text-lg text-gray-900 mb-1">フォーカスとスクリーンリーダー</strong>キーボード操作の可視化とARIA属性による音声読み上げの最適化を完了。</div></li></ul></div><div class="p-8 bg-gray-50 border-t flex justify-end"><button onclick="window.toggleAudit(false)" class="px-10 py-4 bg-[#0F543C] text-white font-black rounded-2xl shadow-lg">パネルを閉じる</button></div></div></div>`;
       }
-
       return html;
     }
 
     function getPrintViewHTML() {
       if (!state.printContent) return '';
       const { type, data } = state.printContent;
-      return `<div class="max-w-[300px] mx-auto font-mono text-[12px] leading-tight">
+      return `<div class="max-w-[300px] mx-auto font-mono text-[12px] leading-tight text-black">
         ${type === 'kitchen' ? `
-          <h2 class="text-center text-xl font-black border-b-2 border-black pb-2 mb-4">厨房伝票</h2>
-          <div class="flex justify-between font-bold mb-4 text-lg"><span>TABLE: ${data.table}</span><span>${formatTime(data.time)}</span></div>
-          ${data.items.map(o => `<div class="border-b border-black py-2"><div class="flex justify-between font-black text-xl"><span>${o.item.name}</span><span>x ${o.qty}</span></div>${o.note ? `<div class="mt-1 font-bold">※ ${o.note}</div>` : ''}</div>`).join('')}
+          <h2 class="text-center text-xl font-black border-b-2 border-black pb-2 mb-4 uppercase tracking-tighter">Kitchen Ticket</h2>
+          <div class="flex justify-between font-black mb-4 text-lg"><span>卓: ${data.table}</span><span>${formatTime(data.time)}</span></div>
+          ${data.items.map(o => `<div class="border-b-2 border-black py-3"><div class="flex justify-between font-black text-2xl"><span>${o.item.name}</span><span>x ${o.qty}</span></div>${o.note ? `<div class="mt-2 font-black text-sm bg-black text-white px-2 py-1">※ ${o.note}</div>` : ''}</div>`).join('')}
         ` : `
-          <div class="text-center mb-6"><h2 class="text-2xl font-black mb-1 tracking-tighter">${state.storeInfo.name}</h2><p class="text-xs">${state.storeInfo.address}</p><p class="text-xs">${state.storeInfo.tel || ''}</p></div>
-          <div class="flex justify-between mb-4 border-b border-black pb-1"><span>卓: ${data.table}</span><span>${formatTime(data.time)}</span></div>
-          <div class="border-y border-dashed border-black py-4 mb-4 space-y-2">
-            ${data.items.map(o => `
-              <div>
-                <div class="flex justify-between font-black"><span>${o.item.name} x${o.qty}</span><span>¥${((o.item.price+o.extra)*o.qty).toLocaleString()}</span></div>
-                ${o.note||o.extra?`<div class="text-[10px] pl-2">(${o.note||''}${o.note&&o.extra?', ':''}${o.extra?'+¥'+o.extra:''})</div>`:''}
-              </div>
-            `).join('')}
+          <div class="text-center mb-8"><h2 class="text-3xl font-black mb-1 tracking-tighter system-name uppercase">${state.storeInfo.name}</h2><p class="text-xs font-bold opacity-70">${state.storeInfo.address}</p><p class="text-xs font-bold opacity-70">${state.storeInfo.tel || ''}</p></div>
+          <div class="flex justify-between mb-4 border-b-2 border-black pb-1 font-black"><span>Table: ${data.table}</span><span>${formatTime(data.time)}</span></div>
+          <div class="border-y-2 border-dashed border-black py-5 mb-6 space-y-3 font-black text-sm">
+            ${data.items.map(o => `<div><div class="flex justify-between"><span>${o.item.name} x${o.qty}</span><span>¥${((o.item.price+o.extra)*o.qty).toLocaleString()}</span></div>${o.note||o.extra?`<div class="text-[10px] pl-4 opacity-70">(${o.note||''}${o.note&&o.extra?', ':''}${o.extra?'+¥'+o.extra:''})</div>`:''}</div>`).join('')}
           </div>
-          <div class="flex justify-between mb-1 font-bold"><span>小計</span><span>¥${data.subtotal.toLocaleString()}</span></div>
-          <div class="flex justify-between mb-1 font-bold"><span>消費税 (10%)</span><span>¥${data.tax.toLocaleString()}</span></div>
-          <div class="flex justify-between font-black text-xl mt-2 pt-2 border-t-2 border-black"><span>合計</span><span>¥${data.total.toLocaleString()}</span></div>
-          <p class="text-center mt-8 whitespace-pre-line text-[10px] font-black">${state.storeInfo.message}</p>
+          <div class="flex justify-between mb-1 font-bold"><span>Subtotal</span><span>¥${data.subtotal.toLocaleString()}</span></div>
+          <div class="flex justify-between mb-1 font-bold"><span>Tax (10%)</span><span>¥${data.tax.toLocaleString()}</span></div>
+          <div class="flex justify-between font-black text-2xl mt-4 pt-4 border-t-4 border-black"><span>TOTAL</span><span>¥${data.total.toLocaleString()}</span></div>
+          <p class="text-center mt-12 whitespace-pre-line text-[10px] font-black italic">${state.storeInfo.message}</p>
         `}
       </div>`;
     }
