@@ -220,7 +220,10 @@
       toSave.salesRecord = state.salesRecord.map(r => ({ ...r, time: r.time.toISOString() }));
       toSave.kitchenTickets = state.kitchenTickets.map(t => ({ ...t, time: t.time.toISOString() }));
       
-      setDoc(docRef, toSave).catch(e => console.error("Save Error:", e));
+      setDoc(docRef, toSave).catch(e => {
+        console.error("Save Error:", e);
+        alert("データベースへの通信に失敗しました。管理者にFirestoreの「ルール」設定を確認してもらってください。\nエラー詳細: " + e.message);
+      });
     }
 
     // --- 認証状態の監視 ---
