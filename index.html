@@ -35,32 +35,78 @@
     }
   </style>
 </head>
-<body class="min-h-screen bg-[#F4F7F5] flex flex-col font-sans print:bg-white text-[#111111]">
+<body class="min-h-screen bg-[#F4F7F5] font-sans print:bg-white text-[#111111]">
 
-  <!-- 印刷用ビュー（通常時は非表示） -->
-  <div id="print-view-container" class="hidden print:block absolute top-0 left-0 w-full bg-white text-black p-8 font-mono text-sm z-50"></div>
+  <!-- ログイン画面コンテナ -->
+  <div id="login-container" class="hidden h-screen w-full flex items-center justify-center bg-[#0F543C] p-4"></div>
 
-  <!-- ヘッダー＆ナビゲーション（印刷時は非表示） -->
-  <header id="header-container" class="bg-[#0F543C] text-white p-4 shadow-md print:hidden flex justify-between items-center" role="banner"></header>
+  <!-- 承認待ち画面コンテナ -->
+  <div id="pending-container" class="hidden h-screen w-full flex items-center justify-center bg-[#0F543C] p-4"></div>
 
-  <!-- メインコンテンツ（印刷時は非表示） -->
-  <main id="main-content" class="flex-1 overflow-hidden print:hidden flex flex-col"></main>
+  <!-- アプリ本体コンテナ -->
+  <div id="app-container" class="hidden flex-col min-h-screen">
+    <!-- 印刷用ビュー（通常時は非表示） -->
+    <div id="print-view-container" class="hidden print:block absolute top-0 left-0 w-full bg-white text-black p-8 font-mono text-sm z-50"></div>
 
-  <!-- 追加: フッター（印刷時は非表示） -->
-  <footer class="bg-[#0A3D2B] text-white py-4 px-6 text-xs print:hidden border-t-4 border-[#0F543C] flex justify-between items-center" role="contentinfo">
-    <div class="text-[#AAAAAA]">&copy; 2026 Midnight Express Computational Archives</div>
-    <div class="flex flex-col items-end opacity-60 hover:opacity-100 transition-opacity">
-      <img src="mecalogo-white.png" alt="MECAロゴ" class="h-6 mb-1 object-contain" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';" />
-      <!-- 画像が見つからない場合のフォールバックテキスト -->
-      <div class="text-lg tracking-wider system-name leading-none mb-1 hidden">mecalogo-white</div>
-      <div class="text-[10px]">しんやせっけいしゃ（MECA）</div>
-    </div>
-  </footer>
+    <!-- ヘッダー＆ナビゲーション（印刷時は非表示） -->
+    <header id="header-container" class="bg-[#0F543C] text-white p-4 shadow-md print:hidden flex justify-between items-center" role="banner"></header>
 
-  <!-- モーダル・プレビュー用コンテナ -->
-  <div id="modal-container"></div>
+    <!-- メインコンテンツ（印刷時は非表示） -->
+    <main id="main-content" class="flex-1 overflow-hidden print:hidden flex flex-col"></main>
 
-  <script>
+    <!-- フッター（印刷時は非表示） -->
+    <footer class="bg-[#0A3D2B] text-white py-4 px-6 text-xs print:hidden border-t-4 border-[#0F543C] flex justify-between items-center" role="contentinfo">
+      <div class="text-[#AAAAAA]">&copy; 2026 Midnight Express Computational Archives</div>
+      <div class="flex flex-col items-end opacity-60 hover:opacity-100 transition-opacity">
+        <img src="mecalogo-white.png" alt="MECAロゴ" class="h-6 mb-1 object-contain" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';" />
+        <div class="text-lg tracking-wider system-name leading-none mb-1 hidden">mecalogo-white</div>
+        <div class="text-[10px]">しんやせっけいしゃ（MECA）</div>
+      </div>
+    </footer>
+
+    <!-- モーダル・プレビュー用コンテナ -->
+    <div id="modal-container"></div>
+  </div>
+
+  <!-- Firebaseを統合したモジュールスクリプト -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+    import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+    import { getFirestore, doc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+    // ==========================================
+    // ▼ ここをご自身のFirebase設定に書き換えてください ▼
+    // （※メールアドレス等をここに書く必要はありません。公開されても安全な接続情報です）
+    // ==========================================
+const firebaseConfig = {
+  apiKey: "AIzaSyDBBDoF8VjeAxEDdSUMxsM4c8eAWrdZFTQ",
+  authDomain: "buon-poss.firebaseapp.com",
+  projectId: "buon-poss",
+  storageBucket: "buon-poss.firebasestorage.app",
+  messagingSenderId: "75771144487",
+  appId: "1:75771144487:web:aa2e0921263edab72d6102"
+};
+    // ==========================================
+
+    const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : DEFAULT_FIREBASE_CONFIG;
+    const appId = typeof __app_id !== 'undefined' ? __app_id : 'buonconto-pos';
+    
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getFirestore(app);
+
+    let currentUser = null;
+    let unsubSnapshot = null;
+    let pendingRequestSent = false;
+
+    // Canvasプレビュー用認証フック
+    const initAuth = async () => {
+      if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+        await signInWithCustomToken(auth, __initial_auth_token);
+      }
+    };
+    initAuth();
+
     // --- 初期データ ---
     const INITIAL_MENU = [
       { id: 1, name: 'マルゲリータ', price: 1200, category: 'ピザ' },
@@ -80,64 +126,95 @@
 
     // --- ステート管理 ---
     const state = {
-      activeTab: 'pos', // pos, kitchen, sales, menu, settings
+      adminEmail: null,      // 追加: 管理者（最初にログインした人）
+      allowedEmails: [],     // 追加: 承認されたユーザーのリスト
+      pendingEmails: [],     // 追加: 承認待ちのユーザーのリスト
+      activeTab: 'pos',
       menu: INITIAL_MENU,
       selectedCategory: 'すべて',
       selectedTable: 1,
       tableOrders: TABLES.reduce((acc, table) => ({ ...acc, [table]: [] }), {}),
       kitchenTickets: [],
       salesRecord: [],
-      printContent: null, // { type: 'kitchen' | 'receipt', data: ... }
+      printContent: null,
       isAuditPanelOpen: false,
       customers: [], 
       editingMenu: null, 
       isCustomerModalOpen: false, 
       deletingMenuId: null,
-      customizingItem: null, // 追加: オプション・備考入力中のメニューアイテム
-      storeInfo: {           // 追加: 店舗情報（レシート印字用）
+      customizingItem: null,
+      storeInfo: {
         name: 'BuonConto',
         address: '東京都板橋区○○ 1-2-3',
         tel: '03-1234-5678',
         message: 'ご来店ありがとうございました。\nまたのお越しをお待ちしております。'
       },
-      storeInfoSaved: false  // 保存完了表示用フラグ
+      storeInfoSaved: false
     };
 
+    // --- Firebase Cloud Sync (リアルタイム共有) ---
+    function startFirestoreListener(user) {
+      // 共有データ用のパス（偶数セグメントで安全に設定）
+      const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'shared_pos', 'state');
+      
+      unsubSnapshot = onSnapshot(docRef, (snapshot) => {
+        if (snapshot.exists()) {
+          const data = snapshot.data();
+          state.adminEmail = data.adminEmail || null;
+          state.allowedEmails = data.allowedEmails || [];
+          state.pendingEmails = data.pendingEmails || [];
+          
+          state.menu = data.menu || INITIAL_MENU;
+          state.customers = data.customers || [];
+          state.storeInfo = data.storeInfo || state.storeInfo;
+          state.tableOrders = data.tableOrders || state.tableOrders;
+          state.salesRecord = (data.salesRecord || []).map(r => ({ ...r, time: new Date(r.time) }));
+          state.kitchenTickets = (data.kitchenTickets || []).map(t => ({ ...t, time: new Date(t.time) }));
+          
+          render();
+        } else {
+          // データがまだ存在しない（システム初起動）場合、この人が「管理者」になる
+          if (user && user.email) {
+            state.adminEmail = user.email;
+          }
+          saveToFirebase();
+        }
+      }, (error) => {
+        console.error("Firebase sync error:", error);
+      });
+    }
 
-    // --- ローカルストレージ自動保存・復元 ---
-    function saveToLocalStorage() {
+    function saveToFirebase() {
+      if (!currentUser) return;
+      const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'shared_pos', 'state');
       const dataToSave = {
+        adminEmail: state.adminEmail,
+        allowedEmails: state.allowedEmails,
+        pendingEmails: state.pendingEmails,
         menu: state.menu,
         customers: state.customers,
-        salesRecord: state.salesRecord,
         storeInfo: state.storeInfo,
         tableOrders: state.tableOrders,
-        kitchenTickets: state.kitchenTickets
+        salesRecord: state.salesRecord.map(r => ({ ...r, time: r.time.toISOString() })),
+        kitchenTickets: state.kitchenTickets.map(t => ({ ...t, time: t.time.toISOString() }))
       };
-      localStorage.setItem('buonconto_data', JSON.stringify(dataToSave));
+      setDoc(docRef, dataToSave).catch(e => console.error("Save error:", e));
     }
 
-    function loadFromLocalStorage() {
-      const dataStr = localStorage.getItem('buonconto_data');
-      if (dataStr) {
-        try {
-          const importedData = JSON.parse(dataStr);
-          if (importedData.menu) state.menu = importedData.menu;
-          if (importedData.customers) state.customers = importedData.customers;
-          if (importedData.storeInfo) state.storeInfo = importedData.storeInfo;
-          if (importedData.tableOrders) state.tableOrders = importedData.tableOrders;
-          // 日付文字列をDateオブジェクトに復元する
-          if (importedData.salesRecord) {
-            state.salesRecord = importedData.salesRecord.map(r => ({ ...r, time: new Date(r.time) }));
-          }
-          if (importedData.kitchenTickets) {
-            state.kitchenTickets = importedData.kitchenTickets.map(t => ({ ...t, time: new Date(t.time) }));
-          }
-        } catch (e) {
-          console.error("データの読み込みに失敗しました", e);
+    // --- 認証状態の監視 ---
+    onAuthStateChanged(auth, (user) => {
+      currentUser = user;
+      pendingRequestSent = false; // ログインが変わるたびにリセット
+      if (user) {
+        startFirestoreListener(user);
+      } else {
+        if (unsubSnapshot) {
+          unsubSnapshot();
+          unsubSnapshot = null;
         }
+        render(); // ログアウト状態を描画
       }
-    }
+    });
 
     // --- 計算・ヘルパー関数 ---
     function formatTime(date) {
@@ -148,160 +225,138 @@
       return date.toLocaleString('ja-JP');
     }
 
-    // --- 操作アクション（グローバル関数化） ---
-    window.setActiveTab = (tab) => { state.activeTab = tab; render(); };
-    window.setSelectedCategory = (cat) => { state.selectedCategory = cat; render(); };
-    window.setSelectedTable = (table) => { state.selectedTable = table; render(); };
-    
-    window.setIsAuditPanelOpen = (isOpen) => { state.isAuditPanelOpen = isOpen; render(); };
-    window.setIsCustomerModalOpen = (isOpen) => { state.isCustomerModalOpen = isOpen; render(); };
-    window.closePrintModal = () => { state.printContent = null; render(); };
-
-    // --- メニューカスタマイズ（備考・追加料金） ---
-    window.openCustomizeModal = (itemId) => {
-      const menuItem = state.menu.find(m => m.id === itemId);
-      state.customizingItem = { item: menuItem, note: '', extraCharge: 0 };
-      render();
-    };
-
-    window.closeCustomizeModal = () => {
-      state.customizingItem = null;
-      render();
-    };
-
-    window.setExtraCharge = (amount) => {
-      const input = document.getElementById('cust-extra');
-      if (input) {
-        input.value = amount;
+    // --- 認証・操作アクション（グローバル関数化） ---
+    window.handleGoogleLogin = async () => {
+      const btn = document.getElementById('login-btn');
+      if (btn) {
+        btn.innerHTML = '<i data-lucide="loader-2" class="w-6 h-6 mr-2 animate-spin"></i> ログイン中...';
+        btn.disabled = true;
+        lucide.createIcons();
+      }
+      
+      const provider = new GoogleAuthProvider();
+      try {
+        await signInWithPopup(auth, provider);
+      } catch (error) {
+        alert("ログイン処理がキャンセルされたか、失敗しました。\n" + error.message);
+        if (btn) {
+          btn.innerHTML = '<svg class="w-6 h-6 mr-3" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/></svg>Googleアカウントで利用する';
+          btn.disabled = false;
+        }
       }
     };
 
+    window.handleLogout = async () => {
+      await signOut(auth);
+    };
+
+    // ユーザー権限管理のアクション
+    window.approveUser = (email) => {
+      state.pendingEmails = state.pendingEmails.filter(e => e !== email);
+      if (!state.allowedEmails.includes(email)) state.allowedEmails.push(email);
+      render();
+      saveToFirebase();
+    };
+
+    window.rejectUser = (email) => {
+      state.pendingEmails = state.pendingEmails.filter(e => e !== email);
+      render();
+      saveToFirebase();
+    };
+
+    window.revokeUser = (email) => {
+      state.allowedEmails = state.allowedEmails.filter(e => e !== email);
+      render();
+      saveToFirebase();
+    };
+
+    window.setActiveTab = (tab) => { state.activeTab = tab; render(); };
+    window.setSelectedCategory = (cat) => { state.selectedCategory = cat; render(); };
+    window.setSelectedTable = (table) => { state.selectedTable = table; render(); };
+    window.setIsAuditPanelOpen = (isOpen) => { state.isAuditPanelOpen = isOpen; render(); };
+    window.setIsCustomerModalOpen = (isOpen) => { state.isCustomerModalOpen = isOpen; render(); };
+    window.closePrintModal = () => { state.printContent = null; render(); };
+    window.openCustomizeModal = (itemId) => { state.customizingItem = { item: state.menu.find(m => m.id === itemId), note: '', extraCharge: 0 }; render(); };
+    window.closeCustomizeModal = () => { state.customizingItem = null; render(); };
+    window.setExtraCharge = (amount) => { const input = document.getElementById('cust-extra'); if (input) input.value = amount; };
+
     window.confirmCustomizedOrder = () => {
       if (!state.customizingItem) return;
-      
       const noteInput = document.getElementById('cust-note');
       const extraInput = document.getElementById('cust-extra');
-      
       const note = noteInput ? noteInput.value.trim() : '';
       const extraCharge = extraInput ? (parseInt(extraInput.value, 10) || 0) : 0;
       const { item } = state.customizingItem;
       const tableOrder = state.tableOrders[state.selectedTable];
 
-      // 全く同じ商品・備考・追加料金の未送信アイテムがあれば、数量を増やす
-      const existingItemIndex = tableOrder.findIndex(o => 
-        o.item.id === item.id && 
-        o.note === note && 
-        o.extraCharge === extraCharge && 
-        !o.sentToKitchen
-      );
-
+      const existingItemIndex = tableOrder.findIndex(o => o.item.id === item.id && o.note === note && o.extraCharge === extraCharge && !o.sentToKitchen);
       if (existingItemIndex >= 0) {
         tableOrder[existingItemIndex].qty += 1;
       } else {
-        tableOrder.push({ 
-          id: Date.now() + Math.random(), // ユニークID
-          item, 
-          qty: 1, 
-          note, 
-          extraCharge, 
-          sentToKitchen: false 
-        });
+        tableOrder.push({ id: Date.now() + Math.random(), item, qty: 1, note, extraCharge, sentToKitchen: false });
       }
-
       state.customizingItem = null;
       render();
+      saveToFirebase();
     };
 
-    // --- 店舗情報用アクション ---
     window.saveStoreInfo = () => {
-      const nameEl = document.getElementById('store-name');
-      const telEl = document.getElementById('store-tel');
-      const addressEl = document.getElementById('store-address');
-      const messageEl = document.getElementById('store-message');
-
-      if (nameEl && telEl && addressEl && messageEl) {
-        state.storeInfo.name = nameEl.value.trim();
-        state.storeInfo.tel = telEl.value.trim();
-        state.storeInfo.address = addressEl.value.trim();
-        state.storeInfo.message = messageEl.value.trim();
-        
-        state.storeInfoSaved = true;
-        render();
-        
-        // 3秒後に「保存しました」の表示を元に戻す
-        setTimeout(() => {
-          state.storeInfoSaved = false;
-          render();
-        }, 3000);
-      }
+      state.storeInfo.name = document.getElementById('store-name').value.trim();
+      state.storeInfo.tel = document.getElementById('store-tel').value.trim();
+      state.storeInfo.address = document.getElementById('store-address').value.trim();
+      state.storeInfo.message = document.getElementById('store-message').value.trim();
+      state.storeInfoSaved = true;
+      render();
+      saveToFirebase();
+      setTimeout(() => { state.storeInfoSaved = false; render(); }, 3000);
     };
 
-    // --- データバックアップ（JSONファイル入出力） ---
     window.exportData = () => {
       const dataToSave = {
-        menu: state.menu,
-        customers: state.customers,
-        salesRecord: state.salesRecord,
-        storeInfo: state.storeInfo,
-        tableOrders: state.tableOrders,
-        kitchenTickets: state.kitchenTickets
+        adminEmail: state.adminEmail, allowedEmails: state.allowedEmails,
+        menu: state.menu, customers: state.customers, storeInfo: state.storeInfo,
+        tableOrders: state.tableOrders, salesRecord: state.salesRecord, kitchenTickets: state.kitchenTickets
       };
-      const jsonStr = JSON.stringify(dataToSave, null, 2);
-      const blob = new Blob([jsonStr], { type: 'application/json' });
+      const blob = new Blob([JSON.stringify(dataToSave, null, 2)], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      
       const d = new Date();
-      const dateStr = `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}_${String(d.getHours()).padStart(2, '0')}${String(d.getMinutes()).padStart(2, '0')}`;
-      a.download = `buonconto_backup_${dateStr}.json`; // 日時つきのファイル名で保存
-      
+      a.download = `buonconto_backup_${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}.json`;
       a.click();
       URL.revokeObjectURL(url);
     };
 
-    window.triggerImport = () => {
-      document.getElementById('import-file-input').click();
-    };
+    window.triggerImport = () => { document.getElementById('import-file-input').click(); };
 
     window.importData = (event) => {
       const file = event.target.files[0];
       if (!file) return;
-      
       const reader = new FileReader();
       reader.onload = (e) => {
         try {
           const importedData = JSON.parse(e.target.result);
+          if (importedData.adminEmail) state.adminEmail = importedData.adminEmail;
+          if (importedData.allowedEmails) state.allowedEmails = importedData.allowedEmails;
           if (importedData.menu) state.menu = importedData.menu;
           if (importedData.customers) state.customers = importedData.customers;
           if (importedData.storeInfo) state.storeInfo = importedData.storeInfo;
           if (importedData.tableOrders) state.tableOrders = importedData.tableOrders;
-          // 日付文字列をDateオブジェクトに復元する
-          if (importedData.salesRecord) {
-            state.salesRecord = importedData.salesRecord.map(r => ({ ...r, time: new Date(r.time) }));
-          }
-          if (importedData.kitchenTickets) {
-            state.kitchenTickets = importedData.kitchenTickets.map(t => ({ ...t, time: new Date(t.time) }));
-          }
-          
-          alert('データの復元が完了しました。');
+          if (importedData.salesRecord) state.salesRecord = importedData.salesRecord.map(r => ({ ...r, time: new Date(r.time) }));
+          if (importedData.kitchenTickets) state.kitchenTickets = importedData.kitchenTickets.map(t => ({ ...t, time: new Date(t.time) }));
+          saveToFirebase();
+          alert('データの復元が完了し、クラウドに同期しました。');
           render();
         } catch (error) {
           alert('ファイルの読み込みに失敗しました。正しいJSONファイルを選択してください。');
-          console.error(error);
         }
       };
       reader.readAsText(file);
-      event.target.value = ''; // 連続で同じファイルを読み込めるようにリセット
+      event.target.value = '';
     };
 
-    // --- メニュー管理用アクション ---
     window.openMenuModal = (id) => {
-      if (id) {
-        state.editingMenu = { ...state.menu.find(m => m.id === id) };
-      } else {
-        state.editingMenu = { id: null, name: '', price: 1000, category: CATEGORIES[1] };
-      }
+      state.editingMenu = id ? { ...state.menu.find(m => m.id === id) } : { id: null, name: '', price: 1000, category: CATEGORIES[1] };
       render();
     };
 
@@ -309,170 +364,163 @@
       const name = document.getElementById('modal-menu-name').value.trim();
       const price = parseInt(document.getElementById('modal-menu-price').value, 10);
       const category = document.getElementById('modal-menu-category').value;
-      
       if (!name || isNaN(price)) return; 
-
       if (state.editingMenu.id) {
         const idx = state.menu.findIndex(m => m.id === state.editingMenu.id);
-        if (idx !== -1) {
-          state.menu[idx] = { id: state.editingMenu.id, name, price, category };
-        }
+        if (idx !== -1) state.menu[idx] = { id: state.editingMenu.id, name, price, category };
       } else {
         state.menu.push({ id: Date.now(), name, price, category });
       }
       state.editingMenu = null;
       render();
+      saveToFirebase();
     };
 
-    window.confirmDeleteMenu = (id) => {
-      state.deletingMenuId = id;
-      render();
-    };
-    
-    window.executeDeleteMenu = () => {
-      state.menu = state.menu.filter(m => m.id !== state.deletingMenuId);
-      state.deletingMenuId = null;
-      render();
-    };
-    
-    window.cancelDeleteMenu = () => {
-      state.deletingMenuId = null;
-      render();
-    };
+    window.confirmDeleteMenu = (id) => { state.deletingMenuId = id; render(); };
+    window.executeDeleteMenu = () => { state.menu = state.menu.filter(m => m.id !== state.deletingMenuId); state.deletingMenuId = null; render(); saveToFirebase(); };
+    window.cancelDeleteMenu = () => { state.deletingMenuId = null; render(); };
 
-    // --- 顧客管理用アクション ---
     window.saveCustomer = () => {
       const name = document.getElementById('modal-cust-name').value.trim();
       const note = document.getElementById('modal-cust-note').value.trim();
-      
       if (!name) return;
-      
       state.customers.push({ id: Date.now(), name, note });
       state.isCustomerModalOpen = false;
       render();
+      saveToFirebase();
     };
 
     window.updateQty = (index, delta) => {
       const tableOrder = state.tableOrders[state.selectedTable];
       const newQty = tableOrder[index].qty + delta;
-      
-      if (newQty <= 0) {
-        tableOrder.splice(index, 1);
-      } else {
-        tableOrder[index].qty = newQty;
-      }
+      if (newQty <= 0) tableOrder.splice(index, 1);
+      else tableOrder[index].qty = newQty;
       render();
+      saveToFirebase();
     };
 
     window.sendToKitchen = () => {
       const currentOrder = state.tableOrders[state.selectedTable];
       const unsentItems = currentOrder.filter(o => !o.sentToKitchen);
       if (unsentItems.length === 0) return;
-
-      const newTicket = {
-        id: Date.now(),
-        table: state.selectedTable,
-        time: new Date(),
-        items: unsentItems.map(o => ({ ...o })),
-        status: 'pending'
-      };
-
+      const newTicket = { id: Date.now(), table: state.selectedTable, time: new Date(), items: unsentItems.map(o => ({ ...o })), status: 'pending' };
       currentOrder.forEach(o => o.sentToKitchen = true);
       state.kitchenTickets.unshift(newTicket);
-      
       state.printContent = { type: 'kitchen', data: newTicket };
       render();
+      saveToFirebase();
     };
 
     window.processCheckout = () => {
       const currentOrder = state.tableOrders[state.selectedTable];
       if (currentOrder.length === 0) return;
-
-      // 小計計算（追加料金を含む）
       const subtotal = currentOrder.reduce((sum, o) => sum + ((o.item.price + (o.extraCharge || 0)) * o.qty), 0);
       const tax = Math.floor(subtotal * 0.1);
       const total = subtotal + tax;
-
-      const receiptData = {
-        id: Date.now(),
-        table: state.selectedTable,
-        time: new Date(),
-        items: [...currentOrder],
-        subtotal,
-        tax,
-        total
-      };
-
+      const receiptData = { id: Date.now(), table: state.selectedTable, time: new Date(), items: [...currentOrder], subtotal, tax, total };
       state.salesRecord.unshift(receiptData);
       state.tableOrders[state.selectedTable] = [];
-
       state.printContent = { type: 'receipt', data: receiptData };
       render();
+      saveToFirebase();
     };
 
     window.markTicketCompleted = (ticketId) => {
       const ticket = state.kitchenTickets.find(t => t.id === ticketId);
       if (ticket) ticket.status = 'completed';
       render();
+      saveToFirebase();
     };
 
-    window.handlePrint = () => {
-      window.print();
-      window.closePrintModal();
-    };
+    window.handlePrint = () => { window.print(); window.closePrintModal(); };
 
-    // --- レンダリング関数群 ---
+    // --- HTML取得用関数群 ---
+    function getLoginHTML() {
+      return `
+        <div class="bg-white p-10 rounded-2xl shadow-2xl max-w-md w-full text-center border-4 border-[#0F543C]">
+          <div class="mb-6 flex justify-center">
+             <i data-lucide="utensils-crossed" class="w-16 h-16 text-[#0F543C]" aria-hidden="true"></i>
+          </div>
+          <h1 class="text-4xl font-black text-[#0F543C] mb-2 system-name">BuonConto</h1>
+          <p class="text-[#444444] font-bold mb-8">店舗システム ログイン</p>
+          
+          <button id="login-btn" onclick="window.handleGoogleLogin()" class="w-full py-4 bg-white hover:bg-[#F4F7F5] text-[#444444] font-bold text-xl rounded-xl transition-colors shadow-md border-2 border-[#CCCCCC] hover:border-[#0F543C] focus:outline-none focus:ring-4 focus:ring-[#0F543C] focus:ring-offset-2 flex items-center justify-center">
+            <svg class="w-6 h-6 mr-3" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/></svg>
+            Googleアカウントで利用する
+          </button>
+          
+          <div class="mt-8 pt-6 border-t border-[#EEEEEE] text-sm text-[#777777] font-bold leading-relaxed">
+            ※ 初回ログイン時は管理者の承認が必要です。<br>
+            ※ 全てのデータは店舗内で安全に共有されます。
+          </div>
+        </div>
+      `;
+    }
+
+    function getPendingHTML() {
+      const email = currentUser?.email || '不明なアカウント';
+      return `
+        <div class="bg-white p-10 rounded-2xl shadow-2xl max-w-md w-full text-center border-4 border-[#0F543C]">
+          <div class="mb-6 flex justify-center">
+             <i data-lucide="clock" class="w-16 h-16 text-[#0F543C]" aria-hidden="true"></i>
+          </div>
+          <h1 class="text-3xl font-black text-[#0F543C] mb-4">利用申請を送信しました</h1>
+          <p class="text-[#444444] font-bold mb-6 leading-relaxed">
+            現在、店舗管理者の承認待ちです。<br>
+            管理者が承認すると、この画面からレジシステムへアクセスできるようになります。
+          </p>
+          <div class="bg-[#F4F7F5] p-4 rounded-xl border border-[#CCCCCC] mb-8 text-left">
+            <span class="text-xs text-[#777777] block mb-1">申請中のGoogleアカウント:</span>
+            <span class="font-bold text-[#111111] text-lg">${email}</span>
+          </div>
+          <button onclick="window.handleLogout()" class="w-full py-4 bg-[#EEEEEE] hover:bg-[#DDDDDD] text-[#444444] font-bold text-lg rounded-xl transition-colors shadow-sm focus:outline-none focus:ring-4 focus:ring-[#0F543C] flex justify-center items-center">
+            <i data-lucide="log-out" class="w-5 h-5 mr-2"></i> キャンセルしてログアウト
+          </button>
+        </div>
+      `;
+    }
 
     function getHeaderHTML() {
       const pendingCount = state.kitchenTickets.filter(t => t.status === 'pending').length;
-      let badgeHTML = '';
-      if (pendingCount > 0) {
-        badgeHTML = `<span class="bg-[#D32F2F] text-white text-sm font-bold px-2 py-0.5 rounded-full ml-1" aria-label="未処理の伝票が${pendingCount}件あります">${pendingCount}</span>`;
-      }
+      let badgeHTML = pendingCount > 0 ? `<span class="bg-[#D32F2F] text-white text-sm font-bold px-2 py-0.5 rounded-full ml-1">${pendingCount}</span>` : '';
       
-      const isPos = state.activeTab === 'pos';
-      const isKitchen = state.activeTab === 'kitchen';
-      const isSales = state.activeTab === 'sales';
-      const isMenu = state.activeTab === 'menu';
-      const isSettings = state.activeTab === 'settings';
-
-      const posClass = isPos ? 'bg-[#FFC700] text-[#111111] font-bold shadow border-[#FFC700]' : 'text-white border-transparent hover:bg-[#146c4d]';
-      const kitchenClass = isKitchen ? 'bg-[#FFC700] text-[#111111] font-bold shadow border-[#FFC700]' : 'text-white border-transparent hover:bg-[#146c4d]';
-      const salesClass = isSales ? 'bg-[#FFC700] text-[#111111] font-bold shadow border-[#FFC700]' : 'text-white border-transparent hover:bg-[#146c4d]';
-      const menuClass = isMenu ? 'bg-[#FFC700] text-[#111111] font-bold shadow border-[#FFC700]' : 'text-white border-transparent hover:bg-[#146c4d]';
-      const settingsClass = isSettings ? 'bg-[#FFC700] text-[#111111] font-bold shadow border-[#FFC700]' : 'text-white border-transparent hover:bg-[#146c4d]';
+      const posClass = state.activeTab === 'pos' ? 'bg-[#FFC700] text-[#111111] font-bold shadow border-[#FFC700]' : 'text-white border-transparent hover:bg-[#146c4d]';
+      const kitchenClass = state.activeTab === 'kitchen' ? 'bg-[#FFC700] text-[#111111] font-bold shadow border-[#FFC700]' : 'text-white border-transparent hover:bg-[#146c4d]';
+      const salesClass = state.activeTab === 'sales' ? 'bg-[#FFC700] text-[#111111] font-bold shadow border-[#FFC700]' : 'text-white border-transparent hover:bg-[#146c4d]';
+      const menuClass = state.activeTab === 'menu' ? 'bg-[#FFC700] text-[#111111] font-bold shadow border-[#FFC700]' : 'text-white border-transparent hover:bg-[#146c4d]';
+      const settingsClass = state.activeTab === 'settings' ? 'bg-[#FFC700] text-[#111111] font-bold shadow border-[#FFC700]' : 'text-white border-transparent hover:bg-[#146c4d]';
 
       return `
         <div class="flex items-center space-x-3">
           <i data-lucide="utensils-crossed" class="w-8 h-8" aria-hidden="true"></i>
           <h1 class="text-2xl tracking-wider system-name">BuonConto</h1>
         </div>
-        <div class="flex items-center space-x-4">
-          <button
-            id="btn-audit"
-            onclick="window.setIsAuditPanelOpen(true)"
-            aria-label="アクセシビリティ監査パネルを開く"
-            class="flex items-center space-x-2 border-2 border-white/40 bg-[#0A3D2B] px-3 py-2 rounded-lg hover:bg-[#146c4d] transition-colors focus:outline-none focus:ring-4 focus:ring-[#FFC700] min-h-[44px]"
-          >
+        <div class="flex items-center space-x-3">
+          <button onclick="window.setIsAuditPanelOpen(true)" aria-label="アクセシビリティ監査パネル" class="flex items-center space-x-2 border-2 border-white/40 bg-[#0A3D2B] px-3 py-2 rounded-lg hover:bg-[#146c4d] transition-colors focus:outline-none focus:ring-4 focus:ring-[#FFC700] min-h-[44px]">
             <i data-lucide="shield-check" class="w-6 h-6" aria-hidden="true"></i>
-            <span class="font-bold text-base tracking-wide">WCAG 2.2 AAA</span>
+            <span class="font-bold tracking-wide hidden lg:inline">WCAG 2.2 AAA</span>
+          </button>
+          
+          <button onclick="window.handleLogout()" aria-label="ログアウト" class="flex items-center space-x-2 border-2 border-white/40 bg-[#D32F2F] px-3 py-2 rounded-lg hover:bg-[#B71C1C] transition-colors focus:outline-none focus:ring-4 focus:ring-[#FFC700] min-h-[44px]">
+            <i data-lucide="log-out" class="w-5 h-5" aria-hidden="true"></i>
+            <span class="font-bold tracking-wide hidden lg:inline">ログアウト</span>
           </button>
 
-          <nav class="flex space-x-2 bg-[#0A3D2B] p-1.5 rounded-lg" aria-label="メインナビゲーション">
-            <button onclick="window.setActiveTab('pos')" aria-current="${isPos ? 'page' : 'false'}" class="px-4 py-2 min-h-[44px] rounded-md flex items-center space-x-2 transition-colors focus:outline-none focus:ring-4 focus:ring-[#FFC700] border-2 ${posClass}">
+          <nav class="flex space-x-1.5 bg-[#0A3D2B] p-1.5 rounded-lg ml-2" aria-label="メインナビゲーション">
+            <button onclick="window.setActiveTab('pos')" class="px-4 py-2 min-h-[44px] rounded-md flex items-center space-x-2 transition-colors border-2 ${posClass}">
               <i data-lucide="calculator" class="w-5 h-5" aria-hidden="true"></i><span class="text-lg">注文・レジ</span>
             </button>
-            <button onclick="window.setActiveTab('kitchen')" aria-current="${isKitchen ? 'page' : 'false'}" class="px-4 py-2 min-h-[44px] rounded-md flex items-center space-x-2 transition-colors focus:outline-none focus:ring-4 focus:ring-[#FFC700] border-2 ${kitchenClass}">
+            <button onclick="window.setActiveTab('kitchen')" class="px-4 py-2 min-h-[44px] rounded-md flex items-center space-x-2 transition-colors border-2 ${kitchenClass}">
               <i data-lucide="chef-hat" class="w-5 h-5" aria-hidden="true"></i><span class="text-lg">厨房伝票</span>${badgeHTML}
             </button>
-            <button onclick="window.setActiveTab('sales')" aria-current="${isSales ? 'page' : 'false'}" class="px-4 py-2 min-h-[44px] rounded-md flex items-center space-x-2 transition-colors focus:outline-none focus:ring-4 focus:ring-[#FFC700] border-2 ${salesClass}">
+            <button onclick="window.setActiveTab('sales')" class="px-4 py-2 min-h-[44px] rounded-md flex items-center space-x-2 transition-colors border-2 ${salesClass}">
               <i data-lucide="book-open" class="w-5 h-5" aria-hidden="true"></i><span class="text-lg">売上帳簿</span>
             </button>
-            <button onclick="window.setActiveTab('menu')" aria-current="${isMenu ? 'page' : 'false'}" class="px-4 py-2 min-h-[44px] rounded-md flex items-center space-x-2 transition-colors focus:outline-none focus:ring-4 focus:ring-[#FFC700] border-2 ${menuClass}">
-              <i data-lucide="clipboard-list" class="w-5 h-5" aria-hidden="true"></i><span class="text-lg">メニュー</span>
+            <button onclick="window.setActiveTab('menu')" class="px-4 py-2 min-h-[44px] rounded-md flex items-center space-x-2 transition-colors border-2 ${menuClass}">
+              <i data-lucide="clipboard-list" class="w-5 h-5" aria-hidden="true"></i><span class="text-lg hidden xl:inline">メニュー</span>
             </button>
-            <button onclick="window.setActiveTab('settings')" aria-current="${isSettings ? 'page' : 'false'}" class="px-4 py-2 min-h-[44px] rounded-md flex items-center space-x-2 transition-colors focus:outline-none focus:ring-4 focus:ring-[#FFC700] border-2 ${settingsClass}">
-              <i data-lucide="settings" class="w-5 h-5" aria-hidden="true"></i><span class="text-lg">設定</span>
+            <button onclick="window.setActiveTab('settings')" class="px-4 py-2 min-h-[44px] rounded-md flex items-center space-x-2 transition-colors border-2 ${settingsClass}">
+              <i data-lucide="settings" class="w-5 h-5" aria-hidden="true"></i><span class="text-lg hidden xl:inline">設定</span>
             </button>
           </nav>
         </div>
@@ -483,8 +531,6 @@
       if (state.activeTab === 'pos') {
         const filteredMenu = state.selectedCategory === 'すべて' ? state.menu : state.menu.filter(i => i.category === state.selectedCategory);
         const currentOrder = state.tableOrders[state.selectedTable];
-        
-        // 小計の計算（オプション料金を加算）
         const subtotal = currentOrder.reduce((sum, o) => sum + ((o.item.price + (o.extraCharge || 0)) * o.qty), 0);
         const tax = Math.floor(subtotal * 0.1);
         const total = subtotal + tax;
@@ -499,8 +545,7 @@
 
         let menuHTML = '';
         filteredMenu.forEach(item => {
-          // 直接カートに入れるのではなく、カスタマイズモーダルを開く
-          menuHTML += `<button onclick="window.openCustomizeModal(${item.id})" aria-label="${item.name} のオプション・備考を入力して注文する。基本価格 ${item.price}円" class="bg-white border-2 border-[#CCCCCC] rounded-xl p-4 flex flex-col items-center justify-center text-center hover:shadow-lg hover:border-[#0F543C] transition-all active:scale-95 min-h-[120px] focus:outline-none focus:ring-4 focus:ring-[#0F543C] focus:ring-offset-2"><span class="text-sm font-bold text-[#444444] mb-1">${item.category}</span><span class="font-bold text-[#111111] text-lg mb-2">${item.name}</span><span class="text-[#0F543C] font-bold text-xl">¥${item.price.toLocaleString()}</span></button>`;
+          menuHTML += `<button onclick="window.openCustomizeModal(${item.id})" class="bg-white border-2 border-[#CCCCCC] rounded-xl p-4 flex flex-col items-center justify-center text-center hover:shadow-lg hover:border-[#0F543C] transition-all active:scale-95 min-h-[120px] focus:outline-none focus:ring-4 focus:ring-[#0F543C] focus:ring-offset-2"><span class="text-sm font-bold text-[#444444] mb-1">${item.category}</span><span class="font-bold text-[#111111] text-lg mb-2">${item.name}</span><span class="text-[#0F543C] font-bold text-xl">¥${item.price.toLocaleString()}</span></button>`;
         });
 
         let tablesHTML = '';
@@ -510,11 +555,8 @@
           const isSelected = state.selectedTable === t;
           let btnClass = isSelected ? 'border-[#0F543C] text-[#0F543C] bg-[#E8F0EC]' : 'border-transparent text-[#444444] hover:bg-[#DDDDDD]';
           if (hasOrder && !isSelected) btnClass = 'bg-[#FFECB3] text-[#805B00]';
-          let badgeHTML = '';
-          if (hasUnsent) {
-            badgeHTML = `<span class="absolute top-0 right-0 w-3.5 h-3.5 bg-[#D32F2F] rounded-full border-2 border-white" aria-hidden="true"></span>`;
-          }
-          tablesHTML += `<button onclick="window.setSelectedTable(${t})" aria-pressed="${isSelected}" aria-label="テーブル ${t}${hasUnsent ? '。未送信の注文あり' : ''}" class="w-12 h-12 min-h-[44px] min-w-[44px] rounded-full flex items-center justify-center font-bold text-lg border-2 transition-colors relative focus:outline-none focus:ring-4 focus:ring-[#0F543C] focus:ring-offset-1 ${btnClass}">${t}${badgeHTML}</button>`;
+          let badgeHTML = hasUnsent ? `<span class="absolute top-0 right-0 w-3.5 h-3.5 bg-[#D32F2F] rounded-full border-2 border-white" aria-hidden="true"></span>` : '';
+          tablesHTML += `<button onclick="window.setSelectedTable(${t})" aria-pressed="${isSelected}" class="w-12 h-12 min-h-[44px] min-w-[44px] rounded-full flex items-center justify-center font-bold text-lg border-2 transition-colors relative focus:outline-none focus:ring-4 focus:ring-[#0F543C] focus:ring-offset-1 ${btnClass}">${t}${badgeHTML}</button>`;
         });
 
         let ordersHTML = '';
@@ -524,41 +566,24 @@
           let itemsListHTML = '';
           currentOrder.forEach((orderItem, index) => {
             const borderClass = orderItem.sentToKitchen ? 'border-[#CCCCCC] opacity-80' : 'border-[#0F543C] shadow-sm';
-            
-            let statusBadge = '';
-            if (orderItem.sentToKitchen) {
-              statusBadge = `<span class="ml-2 text-xs bg-[#EEEEEE] text-[#333333] px-2 py-1 rounded font-bold border border-[#AAAAAA] align-middle">注文済</span>`;
-            }
-
-            // 備考と追加料金の表示部分
-            let noteHTML = '';
-            if (orderItem.note) {
-              noteHTML = `<div class="text-sm text-[#D32F2F] font-bold mt-1"><i data-lucide="message-square-text" class="w-4 h-4 inline-block -mt-1 mr-1"></i>${orderItem.note}</div>`;
-            }
-            let extraChargeHTML = '';
-            if (orderItem.extraCharge) {
-              extraChargeHTML = `<div class="text-sm text-[#0F543C] font-bold mt-0.5"><i data-lucide="plus-circle" class="w-4 h-4 inline-block -mt-1 mr-1"></i>オプション: +¥${orderItem.extraCharge.toLocaleString()}</div>`;
-            }
-
+            let statusBadge = orderItem.sentToKitchen ? `<span class="ml-2 text-xs bg-[#EEEEEE] text-[#333333] px-2 py-1 rounded font-bold border border-[#AAAAAA] align-middle">注文済</span>` : '';
+            let noteHTML = orderItem.note ? `<div class="text-sm text-[#D32F2F] font-bold mt-1"><i data-lucide="message-square-text" class="w-4 h-4 inline-block -mt-1 mr-1"></i>${orderItem.note}</div>` : '';
+            let extraChargeHTML = orderItem.extraCharge ? `<div class="text-sm text-[#0F543C] font-bold mt-0.5"><i data-lucide="plus-circle" class="w-4 h-4 inline-block -mt-1 mr-1"></i>オプション: +¥${orderItem.extraCharge.toLocaleString()}</div>` : '';
             const unitPrice = orderItem.item.price + (orderItem.extraCharge || 0);
             const iconBtn = orderItem.qty === 1 ? `<i data-lucide="trash-2" class="w-6 h-6 text-[#D32F2F]" aria-hidden="true"></i>` : `<i data-lucide="minus" class="w-6 h-6" aria-hidden="true"></i>`;
             
             itemsListHTML += `
               <div class="bg-white p-3 rounded-lg border-2 ${borderClass}">
                 <div class="flex justify-between items-start mb-2">
-                  <div>
-                    <span class="font-bold text-[#111111] text-lg">${orderItem.item.name}</span>${statusBadge}
-                    ${noteHTML}
-                    ${extraChargeHTML}
-                  </div>
+                  <div><span class="font-bold text-[#111111] text-lg">${orderItem.item.name}</span>${statusBadge}${noteHTML}${extraChargeHTML}</div>
                   <span class="font-bold text-lg text-[#111111] pl-2">¥${(unitPrice * orderItem.qty).toLocaleString()}</span>
                 </div>
                 <div class="flex items-center justify-between">
                   <span class="text-sm font-bold text-[#444444]">@ ¥${unitPrice.toLocaleString()}</span>
                   <div class="flex items-center space-x-3 bg-[#F4F7F5] rounded-lg p-1 border border-[#CCCCCC]">
-                    <button onclick="window.updateQty(${index}, -1)" aria-label="${orderItem.item.name} を1つ減らす" class="w-11 h-11 min-h-[44px] min-w-[44px] flex items-center justify-center bg-white rounded-md shadow-sm border border-[#CCCCCC] text-[#222222] hover:bg-[#EEEEEE] focus:outline-none focus:ring-4 focus:ring-[#0F543C]">${iconBtn}</button>
+                    <button onclick="window.updateQty(${index}, -1)" class="w-11 h-11 min-h-[44px] min-w-[44px] flex items-center justify-center bg-white rounded-md shadow-sm border border-[#CCCCCC] text-[#222222] hover:bg-[#EEEEEE] focus:outline-none focus:ring-4 focus:ring-[#0F543C]">${iconBtn}</button>
                     <span class="font-bold text-xl w-6 text-center">${orderItem.qty}</span>
-                    <button onclick="window.updateQty(${index}, 1)" aria-label="${orderItem.item.name} を1つ増やす" class="w-11 h-11 min-h-[44px] min-w-[44px] flex items-center justify-center bg-white rounded-md shadow-sm border border-[#CCCCCC] text-[#222222] hover:bg-[#EEEEEE] focus:outline-none focus:ring-4 focus:ring-[#0F543C]"><i data-lucide="plus" class="w-6 h-6" aria-hidden="true"></i></button>
+                    <button onclick="window.updateQty(${index}, 1)" class="w-11 h-11 min-h-[44px] min-w-[44px] flex items-center justify-center bg-white rounded-md shadow-sm border border-[#CCCCCC] text-[#222222] hover:bg-[#EEEEEE] focus:outline-none focus:ring-4 focus:ring-[#0F543C]"><i data-lucide="plus" class="w-6 h-6" aria-hidden="true"></i></button>
                   </div>
                 </div>
               </div>
@@ -567,16 +592,13 @@
           ordersHTML = `<div class="space-y-3">${itemsListHTML}</div>`;
         }
 
-        const btnSendDisabled = hasUnsentItems ? '' : 'disabled';
-        const btnCheckoutDisabled = currentOrder.length > 0 ? '' : 'disabled';
-
         return `
           <div class="flex h-full">
             <div class="flex-1 flex flex-col border-r-2 border-[#CCCCCC] bg-white h-full overflow-hidden">
-              <div class="p-4 border-b-2 border-[#CCCCCC] flex space-x-3 overflow-x-auto bg-[#F4F7F5]" role="group" aria-label="メニューカテゴリ">
+              <div class="p-4 border-b-2 border-[#CCCCCC] flex space-x-3 overflow-x-auto bg-[#F4F7F5]">
                 ${catsHTML}
               </div>
-              <div class="flex-1 overflow-y-auto p-4 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 content-start" aria-label="メニュー一覧">
+              <div class="flex-1 overflow-y-auto p-4 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 content-start">
                 ${menuHTML}
               </div>
             </div>
@@ -584,9 +606,7 @@
               <div class="p-4 bg-white border-b-2 border-[#CCCCCC] flex flex-col space-y-3 shrink-0">
                 <div class="flex items-center justify-between">
                   <span class="font-bold text-[#222222] text-lg">テーブル:</span>
-                  <div class="flex space-x-2" role="group" aria-label="テーブル選択">
-                    ${tablesHTML}
-                  </div>
+                  <div class="flex space-x-2">${tablesHTML}</div>
                 </div>
                 <div class="border-t-2 border-dashed border-[#EEEEEE] pt-3 flex justify-between items-center">
                   <span class="font-bold text-[#444444] text-sm">顧客管理:</span>
@@ -595,29 +615,19 @@
                   </button>
                 </div>
               </div>
-              <div class="flex-1 overflow-y-auto p-4" aria-live="polite">
-                ${ordersHTML}
-              </div>
+              <div class="flex-1 overflow-y-auto p-4" aria-live="polite">${ordersHTML}</div>
               <div class="bg-white border-t-2 border-[#CCCCCC] p-5 space-y-4 shrink-0">
                 <div class="space-y-2 mb-4">
-                  <div class="flex justify-between text-[#444444] font-bold text-base">
-                    <span>小計</span><span>¥${subtotal.toLocaleString()}</span>
-                  </div>
-                  <div class="flex justify-between text-[#444444] font-bold text-base">
-                    <span>消費税 (10%)</span><span>¥${tax.toLocaleString()}</span>
-                  </div>
-                  <div class="flex justify-between text-2xl font-black text-[#111111] border-t-2 border-[#CCCCCC] pt-3">
-                    <span>合計</span><span>¥${total.toLocaleString()}</span>
-                  </div>
+                  <div class="flex justify-between text-[#444444] font-bold text-base"><span>小計</span><span>¥${subtotal.toLocaleString()}</span></div>
+                  <div class="flex justify-between text-[#444444] font-bold text-base"><span>消費税 (10%)</span><span>¥${tax.toLocaleString()}</span></div>
+                  <div class="flex justify-between text-2xl font-black text-[#111111] border-t-2 border-[#CCCCCC] pt-3"><span>合計</span><span>¥${total.toLocaleString()}</span></div>
                 </div>
                 <div class="space-y-3">
-                  <button onclick="window.sendToKitchen()" ${btnSendDisabled} aria-label="厨房へ注文を送信し伝票を印刷する" class="w-full py-4 min-h-[44px] bg-[#FFC700] hover:bg-[#E6B300] disabled:bg-[#EEEEEE] disabled:text-[#888888] disabled:border-[#CCCCCC] text-[#111111] rounded-xl font-bold flex items-center justify-center space-x-2 transition-colors shadow-sm focus:outline-none focus:ring-4 focus:ring-[#0F543C] focus:ring-offset-2 border-2 border-transparent">
-                    <i data-lucide="printer" class="w-6 h-6" aria-hidden="true"></i>
-                    <span class="text-lg">厨房へ注文 ＆ 伝票印刷</span>
+                  <button onclick="window.sendToKitchen()" ${hasUnsentItems ? '' : 'disabled'} class="w-full py-4 min-h-[44px] bg-[#FFC700] hover:bg-[#E6B300] disabled:bg-[#EEEEEE] disabled:text-[#888888] disabled:border-[#CCCCCC] text-[#111111] rounded-xl font-bold flex items-center justify-center space-x-2 transition-colors shadow-sm focus:outline-none focus:ring-4 focus:ring-[#0F543C] focus:ring-offset-2 border-2 border-transparent">
+                    <i data-lucide="printer" class="w-6 h-6" aria-hidden="true"></i><span class="text-lg">厨房へ注文 ＆ 伝票印刷</span>
                   </button>
-                  <button onclick="window.processCheckout()" ${btnCheckoutDisabled} aria-label="お会計を完了しレシートを印刷する" class="w-full py-5 min-h-[44px] bg-[#0F543C] hover:bg-[#0A3D2B] disabled:bg-[#EEEEEE] disabled:text-[#888888] disabled:border-[#CCCCCC] text-white rounded-xl font-bold flex items-center justify-center space-x-2 transition-colors shadow-md text-xl focus:outline-none focus:ring-4 focus:ring-[#FFC700] focus:ring-offset-2 border-2 border-transparent">
-                    <i data-lucide="calculator" class="w-7 h-7" aria-hidden="true"></i>
-                    <span>お会計 ＆ レシート印刷</span>
+                  <button onclick="window.processCheckout()" ${currentOrder.length > 0 ? '' : 'disabled'} class="w-full py-5 min-h-[44px] bg-[#0F543C] hover:bg-[#0A3D2B] disabled:bg-[#EEEEEE] disabled:text-[#888888] disabled:border-[#CCCCCC] text-white rounded-xl font-bold flex items-center justify-center space-x-2 transition-colors shadow-md text-xl focus:outline-none focus:ring-4 focus:ring-[#FFC700] focus:ring-offset-2 border-2 border-transparent">
+                    <i data-lucide="calculator" class="w-7 h-7" aria-hidden="true"></i><span>お会計 ＆ レシート印刷</span>
                   </button>
                 </div>
               </div>
@@ -627,41 +637,20 @@
       } 
       
       if (state.activeTab === 'kitchen') {
-        let kitchenContent = '';
-        if (state.kitchenTickets.length === 0) {
-          kitchenContent = `<div class="text-center text-[#444444] mt-20 font-bold text-xl">現在、調理待ちの注文はありません</div>`;
-        } else {
+        let kitchenContent = state.kitchenTickets.length === 0 ? `<div class="text-center text-[#444444] mt-20 font-bold text-xl">現在、調理待ちの注文はありません</div>` : '';
+        if (state.kitchenTickets.length > 0) {
           let ticketsHTML = '';
           state.kitchenTickets.forEach(ticket => {
             const isPending = ticket.status === 'pending';
-            const borderClass = isPending ? 'border-t-[#FFC700] border-[#CCCCCC]' : 'border-t-[#999999] border-[#EEEEEE] opacity-70';
-            
             let itemsHTML = '';
             ticket.items.forEach(item => {
-              // 備考を目立たせるHTML
-              let noteHTML = '';
-              if (item.note) {
-                noteHTML = `<div class="text-[#D32F2F] text-sm mt-1 ml-2 font-bold bg-[#FFEBEB] inline-block px-2 py-0.5 rounded border border-[#D32F2F]"><i data-lucide="alert-circle" class="w-3 h-3 inline-block -mt-0.5 mr-1"></i>${item.note}</div>`;
-              }
-              itemsHTML += `
-                <li class="border-b border-dashed border-[#CCCCCC] pb-3 last:border-0 last:pb-0">
-                  <div class="flex justify-between items-start text-xl">
-                    <span class="font-bold text-[#111111]">${item.item.name}</span>
-                    <span class="font-bold text-[#0F543C] bg-[#E8F0EC] px-3 py-1 rounded-md border border-[#0F543C]">x${item.qty}</span>
-                  </div>
-                  ${noteHTML}
-                </li>
-              `;
+              let noteHTML = item.note ? `<div class="text-[#D32F2F] text-sm mt-1 ml-2 font-bold bg-[#FFEBEB] inline-block px-2 py-0.5 rounded border border-[#D32F2F]"><i data-lucide="alert-circle" class="w-3 h-3 inline-block -mt-0.5 mr-1"></i>${item.note}</div>` : '';
+              itemsHTML += `<li class="border-b border-dashed border-[#CCCCCC] pb-3 last:border-0 last:pb-0"><div class="flex justify-between items-start text-xl"><span class="font-bold text-[#111111]">${item.item.name}</span><span class="font-bold text-[#0F543C] bg-[#E8F0EC] px-3 py-1 rounded-md border border-[#0F543C]">x${item.qty}</span></div>${noteHTML}</li>`;
             });
-
-            let actionHTML = '';
-            if (isPending) {
-              actionHTML = `<button onclick="window.markTicketCompleted(${ticket.id})" aria-label="テーブル${ticket.table}の調理を完了とする" class="w-full py-4 min-h-[44px] bg-[#0F543C] hover:bg-[#0A3D2B] text-white font-bold text-lg rounded-xl flex items-center justify-center transition-colors focus:outline-none focus:ring-4 focus:ring-[#FFC700] focus:ring-offset-2"><i data-lucide="circle-check" class="w-6 h-6 mr-2" aria-hidden="true"></i> 調理完了</button>`;
-            } else {
-              actionHTML = `<div class="w-full py-4 text-[#444444] font-bold text-lg text-center flex items-center justify-center border-2 border-[#CCCCCC] rounded-xl bg-[#EEEEEE]" aria-label="提供済み"><i data-lucide="circle-check" class="w-6 h-6 mr-2" aria-hidden="true"></i> 提供済み</div>`;
-            }
-
-            ticketsHTML += `<div class="bg-white rounded-xl shadow-md border-t-8 overflow-hidden flex flex-col border-2 ${borderClass}"><div class="p-4 border-b-2 border-[#EEEEEE] bg-[#F8F9FA] flex justify-between items-center"><span class="font-bold text-2xl text-[#111111]">Tbl ${ticket.table}</span><span class="font-bold text-[#444444]">${formatTime(ticket.time)}</span></div><div class="p-5 flex-1"><ul class="space-y-4">${itemsHTML}</ul></div><div class="p-4 bg-[#F8F9FA] border-t-2 border-[#EEEEEE]">${actionHTML}</div></div>`;
+            let actionHTML = isPending 
+              ? `<button onclick="window.markTicketCompleted(${ticket.id})" class="w-full py-4 min-h-[44px] bg-[#0F543C] hover:bg-[#0A3D2B] text-white font-bold text-lg rounded-xl flex items-center justify-center transition-colors focus:outline-none focus:ring-4 focus:ring-[#FFC700] focus:ring-offset-2"><i data-lucide="circle-check" class="w-6 h-6 mr-2" aria-hidden="true"></i> 調理完了</button>`
+              : `<div class="w-full py-4 text-[#444444] font-bold text-lg text-center flex items-center justify-center border-2 border-[#CCCCCC] rounded-xl bg-[#EEEEEE]"><i data-lucide="circle-check" class="w-6 h-6 mr-2" aria-hidden="true"></i> 提供済み</div>`;
+            ticketsHTML += `<div class="bg-white rounded-xl shadow-md border-t-8 overflow-hidden flex flex-col border-2 ${isPending ? 'border-t-[#FFC700] border-[#CCCCCC]' : 'border-t-[#999999] border-[#EEEEEE] opacity-70'}"><div class="p-4 border-b-2 border-[#EEEEEE] bg-[#F8F9FA] flex justify-between items-center"><span class="font-bold text-2xl text-[#111111]">Tbl ${ticket.table}</span><span class="font-bold text-[#444444]">${formatTime(ticket.time)}</span></div><div class="p-5 flex-1"><ul class="space-y-4">${itemsHTML}</ul></div><div class="p-4 bg-[#F8F9FA] border-t-2 border-[#EEEEEE]">${actionHTML}</div></div>`;
           });
           kitchenContent = `<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 content-start">${ticketsHTML}</div>`;
         }
@@ -678,23 +667,18 @@
 
       if (state.activeTab === 'sales') {
         const totalSales = state.salesRecord.reduce((sum, r) => sum + r.total, 0);
-        let salesContent = '';
-        if (state.salesRecord.length === 0) {
-          salesContent = `<div class="p-10 text-center text-[#444444] font-bold text-lg">本日の売上はまだありません。</div>`;
-        } else {
+        let salesContent = state.salesRecord.length === 0 ? `<div class="p-10 text-center text-[#444444] font-bold text-lg">本日の売上はまだありません。</div>` : '';
+        if (state.salesRecord.length > 0) {
           let rowsHTML = '';
           state.salesRecord.forEach(record => {
             const itemsText = record.items.map(i => {
               let text = i.item.name + 'x' + i.qty;
-              if (i.note || i.extraCharge) {
-                text += ` <span class="text-[#D32F2F] text-xs">(${i.note ? i.note : ''}${i.note && i.extraCharge ? ', ' : ''}${i.extraCharge ? '+¥'+i.extraCharge : ''})</span>`;
-              }
+              if (i.note || i.extraCharge) text += ` <span class="text-[#D32F2F] text-xs">(${i.note ? i.note : ''}${i.note && i.extraCharge ? ', ' : ''}${i.extraCharge ? '+¥'+i.extraCharge : ''})</span>`;
               return text;
             }).join('<br/>');
-            
             rowsHTML += `<tr class="hover:bg-[#F4F7F5]"><td class="p-4 text-[#222222] font-bold align-top">${formatTime(record.time)}</td><td class="p-4 font-bold text-lg text-[#111111] align-top">Tbl ${record.table}</td><td class="p-4 text-base font-medium text-[#333333] leading-relaxed align-top">${itemsText}</td><td class="p-4 font-black text-xl text-right text-[#0F543C] align-top">¥${record.total.toLocaleString()}</td></tr>`;
           });
-          salesContent = `<table class="w-full text-left border-collapse"><caption class="sr-only">本日の会計履歴一覧</caption><thead class="bg-[#E8F0EC] text-[#111111] border-b-2 border-[#0F543C]"><tr><th scope="col" class="p-4 font-bold text-lg">時間</th><th scope="col" class="p-4 font-bold text-lg">テーブル</th><th scope="col" class="p-4 font-bold text-lg">注文内容</th><th scope="col" class="p-4 font-bold text-lg text-right">金額 (税込)</th></tr></thead><tbody class="divide-y-2 divide-[#EEEEEE]">${rowsHTML}</tbody></table>`;
+          salesContent = `<table class="w-full text-left border-collapse"><thead class="bg-[#E8F0EC] text-[#111111] border-b-2 border-[#0F543C]"><tr><th class="p-4 font-bold text-lg">時間</th><th class="p-4 font-bold text-lg">テーブル</th><th class="p-4 font-bold text-lg">注文内容</th><th class="p-4 font-bold text-lg text-right">金額 (税込)</th></tr></thead><tbody class="divide-y-2 divide-[#EEEEEE]">${rowsHTML}</tbody></table>`;
         }
 
         return `
@@ -702,10 +686,8 @@
             <div class="max-w-4xl mx-auto">
               <div class="bg-white rounded-2xl shadow-sm p-6 mb-8 border-2 border-[#CCCCCC] flex items-center justify-between">
                 <div>
-                  <h2 class="text-xl text-[#444444] font-bold mb-2">本日の売上合計 (帳簿)</h2>
-                  <div class="text-5xl font-black text-[#0F543C]">
-                    ¥${totalSales.toLocaleString()}
-                  </div>
+                  <h2 class="text-xl text-[#444444] font-bold mb-2">本日の売上合計 (クラウド連携中)</h2>
+                  <div class="text-5xl font-black text-[#0F543C]">¥${totalSales.toLocaleString()}</div>
                 </div>
                 <div class="text-right border-l-2 border-[#EEEEEE] pl-6">
                   <div class="text-lg text-[#444444] font-bold mb-1">来客数 (会計回数)</div>
@@ -713,9 +695,7 @@
                 </div>
               </div>
               <div class="bg-white rounded-2xl shadow-sm border-2 border-[#CCCCCC] overflow-hidden">
-                <div class="p-5 bg-[#F8F9FA] border-b-2 border-[#CCCCCC] font-bold text-xl text-[#111111]">
-                  会計履歴
-                </div>
+                <div class="p-5 bg-[#F8F9FA] border-b-2 border-[#CCCCCC] font-bold text-xl text-[#111111]">会計履歴</div>
                 ${salesContent}
               </div>
             </div>
@@ -732,12 +712,8 @@
               <td class="p-3 text-[#444444]">${item.category}</td>
               <td class="p-3 font-bold text-[#0F543C]">¥${item.price.toLocaleString()}</td>
               <td class="p-3 text-right">
-                <button onclick="window.openMenuModal(${item.id})" aria-label="${item.name}を編集する" class="px-4 py-2 bg-[#EEEEEE] hover:bg-[#DDDDDD] text-[#111111] rounded-lg font-bold min-h-[44px] focus:outline-none focus:ring-4 focus:ring-[#0F543C] mr-2 shadow-sm border border-[#CCCCCC]">
-                  <i data-lucide="pencil" class="w-5 h-5 inline-block -mt-1 mr-1"></i> 編集
-                </button>
-                <button onclick="window.confirmDeleteMenu(${item.id})" aria-label="${item.name}を削除する" class="px-4 py-2 bg-[#FFEBEB] hover:bg-[#FFD6D6] text-[#D32F2F] rounded-lg font-bold min-h-[44px] focus:outline-none focus:ring-4 focus:ring-[#D32F2F] shadow-sm border border-[#FFD6D6]">
-                  <i data-lucide="trash-2" class="w-5 h-5 inline-block -mt-1 mr-1"></i> 削除
-                </button>
+                <button onclick="window.openMenuModal(${item.id})" class="px-4 py-2 bg-[#EEEEEE] hover:bg-[#DDDDDD] text-[#111111] rounded-lg font-bold min-h-[44px] focus:outline-none focus:ring-4 focus:ring-[#0F543C] mr-2 shadow-sm border border-[#CCCCCC]"><i data-lucide="pencil" class="w-5 h-5 inline-block -mt-1 mr-1"></i> 編集</button>
+                <button onclick="window.confirmDeleteMenu(${item.id})" class="px-4 py-2 bg-[#FFEBEB] hover:bg-[#FFD6D6] text-[#D32F2F] rounded-lg font-bold min-h-[44px] focus:outline-none focus:ring-4 focus:ring-[#D32F2F] shadow-sm border border-[#FFD6D6]"><i data-lucide="trash-2" class="w-5 h-5 inline-block -mt-1 mr-1"></i> 削除</button>
               </td>
             </tr>
           `;
@@ -745,29 +721,14 @@
 
         return `
           <div class="p-8 h-full overflow-y-auto bg-[#F4F7F5]">
-            <h2 class="text-3xl font-bold text-[#111111] mb-6 flex items-center border-b-2 border-[#CCCCCC] pb-4">
-              <i data-lucide="clipboard-list" class="mr-3 text-[#0F543C] w-8 h-8" aria-hidden="true"></i> メニュー管理
-            </h2>
-            
+            <h2 class="text-3xl font-bold text-[#111111] mb-6 flex items-center border-b-2 border-[#CCCCCC] pb-4"><i data-lucide="clipboard-list" class="mr-3 text-[#0F543C] w-8 h-8" aria-hidden="true"></i> メニュー管理</h2>
             <div class="bg-white rounded-2xl shadow-sm border-2 border-[#CCCCCC] overflow-hidden">
               <div class="p-5 bg-[#F8F9FA] border-b-2 border-[#CCCCCC] flex justify-between items-center">
                 <h3 class="font-bold text-xl text-[#111111]">提供メニュー一覧</h3>
-                <button onclick="window.openMenuModal()" class="px-4 py-2 bg-[#0F543C] text-white font-bold rounded-lg hover:bg-[#0A3D2B] min-h-[44px] focus:outline-none focus:ring-4 focus:ring-[#FFC700] flex items-center shadow-md border-2 border-transparent">
-                  <i data-lucide="plus" class="w-5 h-5 mr-1" aria-hidden="true"></i> 新規メニュー追加
-                </button>
+                <button onclick="window.openMenuModal()" class="px-4 py-2 bg-[#0F543C] text-white font-bold rounded-lg hover:bg-[#0A3D2B] min-h-[44px] focus:outline-none focus:ring-4 focus:ring-[#FFC700] flex items-center shadow-md border-2 border-transparent"><i data-lucide="plus" class="w-5 h-5 mr-1" aria-hidden="true"></i> 新規メニュー追加</button>
               </div>
               <div class="p-0 overflow-x-auto">
-                <table class="w-full text-left min-w-[600px]">
-                  <thead class="bg-[#E8F0EC] text-[#111111] border-b-2 border-[#0F543C]">
-                    <tr>
-                      <th class="p-4 font-bold">商品名</th>
-                      <th class="p-4 font-bold">カテゴリ</th>
-                      <th class="p-4 font-bold">価格</th>
-                      <th class="p-4 font-bold text-right">操作</th>
-                    </tr>
-                  </thead>
-                  <tbody>${menuRows}</tbody>
-                </table>
+                <table class="w-full text-left min-w-[600px]"><thead class="bg-[#E8F0EC] text-[#111111] border-b-2 border-[#0F543C]"><tr><th class="p-4 font-bold">商品名</th><th class="p-4 font-bold">カテゴリ</th><th class="p-4 font-bold">価格</th><th class="p-4 font-bold text-right">操作</th></tr></thead><tbody>${menuRows}</tbody></table>
               </div>
             </div>
           </div>
@@ -775,79 +736,94 @@
       }
 
       if (state.activeTab === 'settings') {
-        let custRows = '';
-        if (state.customers.length === 0) {
-          custRows = `<tr><td colspan="2" class="p-6 text-center text-[#555555] font-bold text-lg">登録されているお得意様はいません</td></tr>`;
-        } else {
-          state.customers.forEach(cust => {
-            custRows += `
-              <tr class="border-b-2 border-[#EEEEEE] hover:bg-[#F4F7F5]">
-                <td class="p-3 font-bold text-[#111111] text-lg">${cust.name}</td>
-                <td class="p-3 text-[#444444]">${cust.note}</td>
-              </tr>
-            `;
-          });
-        }
+        let custRows = state.customers.length === 0 ? `<tr><td colspan="2" class="p-6 text-center text-[#555555] font-bold text-lg">登録されているお得意様はいません</td></tr>` : '';
+        state.customers.forEach(cust => { custRows += `<tr class="border-b-2 border-[#EEEEEE] hover:bg-[#F4F7F5]"><td class="p-3 font-bold text-[#111111] text-lg">${cust.name}</td><td class="p-3 text-[#444444]">${cust.note}</td></tr>`; });
 
-        const saveBtnContent = state.storeInfoSaved 
-          ? `<i data-lucide="check" class="w-5 h-5 mr-1" aria-hidden="true"></i> 保存しました` 
-          : `<i data-lucide="save" class="w-5 h-5 mr-1" aria-hidden="true"></i> 保存する`;
+        const saveBtnContent = state.storeInfoSaved ? `<i data-lucide="check" class="w-5 h-5 mr-1" aria-hidden="true"></i> 保存しました` : `<i data-lucide="save" class="w-5 h-5 mr-1" aria-hidden="true"></i> 保存する`;
         const saveBtnColor = state.storeInfoSaved ? 'bg-green-600 hover:bg-green-700' : 'bg-[#0F543C] hover:bg-[#0A3D2B]';
+
+        // ユーザー権限管理パネル（管理者のみ表示）
+        let userManagementHTML = '';
+        const email = currentUser?.email;
+        const isAdmin = !email || email === state.adminEmail; // Canvas等は管理者扱い
+
+        if (isAdmin) {
+          let pendingRows = state.pendingEmails.length === 0 
+            ? `<tr><td colspan="2" class="p-4 text-center text-[#555555] font-bold">現在、利用申請はありません</td></tr>`
+            : state.pendingEmails.map(e => `
+                <tr class="border-b-2 border-[#EEEEEE] hover:bg-[#F4F7F5]">
+                  <td class="p-3 font-bold text-[#111111]">${e}</td>
+                  <td class="p-3 text-right">
+                    <button onclick="window.approveUser('${e}')" class="px-4 py-2 bg-[#0F543C] text-white font-bold rounded-lg hover:bg-[#0A3D2B] min-h-[44px] shadow-sm border-2 border-transparent">承認する</button>
+                    <button onclick="window.rejectUser('${e}')" class="px-4 py-2 bg-[#FFEBEB] text-[#D32F2F] font-bold rounded-lg hover:bg-[#FFD6D6] min-h-[44px] shadow-sm border border-[#FFD6D6] ml-2">拒否</button>
+                  </td>
+                </tr>
+              `).join('');
+
+          let allowedRows = state.allowedEmails.length === 0
+            ? `<tr><td colspan="2" class="p-4 text-center text-[#555555] font-bold">承認済みのユーザーはいません</td></tr>`
+            : state.allowedEmails.map(e => `
+                <tr class="border-b-2 border-[#EEEEEE] hover:bg-[#F4F7F5]">
+                  <td class="p-3 font-bold text-[#111111]">${e}</td>
+                  <td class="p-3 text-right">
+                    <button onclick="window.revokeUser('${e}')" class="px-4 py-2 bg-[#FFEBEB] text-[#D32F2F] font-bold rounded-lg hover:bg-[#FFD6D6] min-h-[44px] shadow-sm border border-[#FFD6D6]">権限取消</button>
+                  </td>
+                </tr>
+              `).join('');
+
+          userManagementHTML = `
+            <div class="bg-white rounded-2xl shadow-sm border-4 border-[#0F543C] overflow-hidden">
+              <div class="p-5 bg-[#0F543C] flex justify-between items-center text-white">
+                <h3 class="font-bold text-xl flex items-center">
+                  <i data-lucide="shield" class="w-5 h-5 mr-2" aria-hidden="true"></i> アクセス権限管理（管理者専用）
+                </h3>
+                <span class="text-xs font-bold bg-[#0A3D2B] px-3 py-1 rounded-full border border-white/20">オーナー: ${state.adminEmail || '未設定'}</span>
+              </div>
+              <div class="p-6 space-y-6">
+                <div>
+                  <h4 class="font-bold text-[#0F543C] mb-3 border-b-2 border-[#0F543C] pb-1">承認待ちの利用申請</h4>
+                  <table class="w-full text-left border-collapse"><tbody class="divide-y-2 divide-[#EEEEEE]">${pendingRows}</tbody></table>
+                </div>
+                <div>
+                  <h4 class="font-bold text-[#0F543C] mb-3 border-b-2 border-[#0F543C] pb-1">利用許可済みのユーザー</h4>
+                  <table class="w-full text-left border-collapse"><tbody class="divide-y-2 divide-[#EEEEEE]">${allowedRows}</tbody></table>
+                </div>
+              </div>
+            </div>
+          `;
+        }
 
         return `
           <div class="p-8 h-full overflow-y-auto bg-[#F4F7F5]">
-            <h2 class="text-3xl font-bold text-[#111111] mb-6 flex items-center border-b-2 border-[#CCCCCC] pb-4">
-              <i data-lucide="settings" class="mr-3 text-[#0F543C] w-8 h-8" aria-hidden="true"></i> 設定・管理
-            </h2>
+            <h2 class="text-3xl font-bold text-[#111111] mb-6 flex items-center border-b-2 border-[#CCCCCC] pb-4"><i data-lucide="settings" class="mr-3 text-[#0F543C] w-8 h-8" aria-hidden="true"></i> 設定・管理</h2>
             
             <div class="space-y-8">
+              ${userManagementHTML}
+            
               <!-- データバックアップ管理 -->
               <div class="bg-white rounded-2xl shadow-sm border-2 border-[#CCCCCC] overflow-hidden">
-                <div class="p-5 bg-[#F8F9FA] border-b-2 border-[#CCCCCC]">
-                  <h3 class="font-bold text-xl text-[#111111] flex items-center">
-                    <i data-lucide="database" class="w-5 h-5 mr-2" aria-hidden="true"></i> データバックアップ・復元
-                  </h3>
-                </div>
+                <div class="p-5 bg-[#F8F9FA] border-b-2 border-[#CCCCCC]"><h3 class="font-bold text-xl text-[#111111] flex items-center"><i data-lucide="database" class="w-5 h-5 mr-2" aria-hidden="true"></i> データバックアップ (JSON)</h3></div>
                 <div class="p-6">
-                  <p class="text-[#444444] font-bold mb-4 leading-relaxed">万が一ブラウザのデータが消えてしまっても復旧できるように、現在の状態（メニュー、売上、顧客情報など）をJSONファイルとして端末にダウンロードして保存できます。毎日の営業終了後にバックアップを保存することをおすすめします。</p>
+                  <p class="text-[#444444] font-bold mb-4 leading-relaxed">全てのデータはクラウドに自動保存されていますが、手動でJSONファイルとしてバックアップをダウンロードすることも可能です。</p>
                   <div class="flex flex-wrap gap-4">
-                    <button onclick="window.exportData()" class="px-6 py-3 bg-[#0F543C] text-white font-bold rounded-xl hover:bg-[#0A3D2B] shadow-md border-2 border-transparent focus:outline-none focus:ring-4 focus:ring-[#FFC700] flex items-center transition-colors">
-                      <i data-lucide="download" class="w-5 h-5 mr-2" aria-hidden="true"></i> ファイルへ保存 (バックアップ)
-                    </button>
-                    
-                    <button onclick="window.triggerImport()" class="px-6 py-3 bg-white text-[#0F543C] font-bold rounded-xl hover:bg-[#E8F0EC] shadow-md border-2 border-[#0F543C] focus:outline-none focus:ring-4 focus:ring-[#FFC700] flex items-center transition-colors">
-                      <i data-lucide="upload" class="w-5 h-5 mr-2" aria-hidden="true"></i> ファイルから復元 (インポート)
-                    </button>
+                    <button onclick="window.exportData()" class="px-6 py-3 bg-[#0F543C] text-white font-bold rounded-xl hover:bg-[#0A3D2B] shadow-md border-2 border-transparent focus:outline-none focus:ring-4 focus:ring-[#FFC700] flex items-center transition-colors"><i data-lucide="download" class="w-5 h-5 mr-2" aria-hidden="true"></i> ファイルへ保存 (バックアップ)</button>
+                    <button onclick="window.triggerImport()" class="px-6 py-3 bg-white text-[#0F543C] font-bold rounded-xl hover:bg-[#E8F0EC] shadow-md border-2 border-[#0F543C] focus:outline-none focus:ring-4 focus:ring-[#FFC700] flex items-center transition-colors"><i data-lucide="upload" class="w-5 h-5 mr-2" aria-hidden="true"></i> ファイルから復元 (上書き)</button>
                     <input type="file" id="import-file-input" accept=".json" class="hidden" onchange="window.importData(event)">
                   </div>
                 </div>
               </div>
 
-              <!-- 店舗情報設定 (レシート用) -->
+              <!-- 店舗情報設定 -->
               <div class="bg-white rounded-2xl shadow-sm border-2 border-[#CCCCCC] overflow-hidden">
                 <div class="p-5 bg-[#F8F9FA] border-b-2 border-[#CCCCCC] flex justify-between items-center">
                   <h3 class="font-bold text-xl text-[#111111]">店舗情報 (レシート印字用)</h3>
-                  <button onclick="window.saveStoreInfo()" class="px-4 py-2 ${saveBtnColor} text-white font-bold rounded-lg min-h-[44px] focus:outline-none focus:ring-4 focus:ring-[#FFC700] flex items-center shadow-md border-2 border-transparent transition-colors">
-                    ${saveBtnContent}
-                  </button>
+                  <button onclick="window.saveStoreInfo()" class="px-4 py-2 ${saveBtnColor} text-white font-bold rounded-lg min-h-[44px] focus:outline-none focus:ring-4 focus:ring-[#FFC700] flex items-center shadow-md border-2 border-transparent transition-colors">${saveBtnContent}</button>
                 </div>
                 <div class="p-5 grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div>
-                    <label class="block font-bold text-[#111111] mb-2" for="store-name">店名</label>
-                    <input type="text" id="store-name" value="${state.storeInfo.name}" placeholder="例: BuonConto" class="w-full border-2 border-[#CCCCCC] rounded-lg p-3 text-lg font-bold focus:outline-none focus:border-[#0F543C] focus:ring-2 focus:ring-[#0F543C]">
-                  </div>
-                  <div>
-                    <label class="block font-bold text-[#111111] mb-2" for="store-tel">電話番号</label>
-                    <input type="text" id="store-tel" value="${state.storeInfo.tel}" placeholder="例: 03-1234-5678" class="w-full border-2 border-[#CCCCCC] rounded-lg p-3 text-lg font-bold focus:outline-none focus:border-[#0F543C] focus:ring-2 focus:ring-[#0F543C]">
-                  </div>
-                  <div class="md:col-span-2">
-                    <label class="block font-bold text-[#111111] mb-2" for="store-address">住所</label>
-                    <input type="text" id="store-address" value="${state.storeInfo.address}" placeholder="例: 東京都板橋区○○ 1-2-3" class="w-full border-2 border-[#CCCCCC] rounded-lg p-3 text-lg font-bold focus:outline-none focus:border-[#0F543C] focus:ring-2 focus:ring-[#0F543C]">
-                  </div>
-                  <div class="md:col-span-2">
-                    <label class="block font-bold text-[#111111] mb-2" for="store-message">レシート下部メッセージ</label>
-                    <textarea id="store-message" rows="2" placeholder="ご来店ありがとうございました。" class="w-full border-2 border-[#CCCCCC] rounded-lg p-3 text-lg font-bold focus:outline-none focus:border-[#0F543C] focus:ring-2 focus:ring-[#0F543C]">${state.storeInfo.message}</textarea>
-                  </div>
+                  <div><label class="block font-bold text-[#111111] mb-2" for="store-name">店名</label><input type="text" id="store-name" value="${state.storeInfo.name}" class="w-full border-2 border-[#CCCCCC] rounded-lg p-3 text-lg font-bold focus:outline-none focus:border-[#0F543C]"></div>
+                  <div><label class="block font-bold text-[#111111] mb-2" for="store-tel">電話番号</label><input type="text" id="store-tel" value="${state.storeInfo.tel}" class="w-full border-2 border-[#CCCCCC] rounded-lg p-3 text-lg font-bold focus:outline-none focus:border-[#0F543C]"></div>
+                  <div class="md:col-span-2"><label class="block font-bold text-[#111111] mb-2" for="store-address">住所</label><input type="text" id="store-address" value="${state.storeInfo.address}" class="w-full border-2 border-[#CCCCCC] rounded-lg p-3 text-lg font-bold focus:outline-none focus:border-[#0F543C]"></div>
+                  <div class="md:col-span-2"><label class="block font-bold text-[#111111] mb-2" for="store-message">レシート下部メッセージ</label><textarea id="store-message" rows="2" class="w-full border-2 border-[#CCCCCC] rounded-lg p-3 text-lg font-bold focus:outline-none focus:border-[#0F543C]">${state.storeInfo.message}</textarea></div>
                 </div>
               </div>
 
@@ -855,20 +831,10 @@
               <div class="bg-white rounded-2xl shadow-sm border-2 border-[#CCCCCC] overflow-hidden">
                 <div class="p-5 bg-[#F8F9FA] border-b-2 border-[#CCCCCC] flex justify-between items-center">
                   <h3 class="font-bold text-xl text-[#111111]">お得意様一覧</h3>
-                  <button onclick="window.setIsCustomerModalOpen(true)" class="px-4 py-2 bg-[#0F543C] text-white font-bold rounded-lg hover:bg-[#0A3D2B] min-h-[44px] focus:outline-none focus:ring-4 focus:ring-[#FFC700] flex items-center shadow-md border-2 border-transparent">
-                    <i data-lucide="user-plus" class="w-5 h-5 mr-1" aria-hidden="true"></i> 新規登録
-                  </button>
+                  <button onclick="window.setIsCustomerModalOpen(true)" class="px-4 py-2 bg-[#0F543C] text-white font-bold rounded-lg hover:bg-[#0A3D2B] min-h-[44px] focus:outline-none focus:ring-4 focus:ring-[#FFC700] flex items-center shadow-md border-2 border-transparent"><i data-lucide="user-plus" class="w-5 h-5 mr-1" aria-hidden="true"></i> 新規登録</button>
                 </div>
                 <div class="p-0 overflow-x-auto">
-                  <table class="w-full text-left min-w-[300px]">
-                    <thead class="bg-[#E8F0EC] text-[#111111] border-b-2 border-[#0F543C]">
-                      <tr>
-                        <th class="p-4 font-bold w-1/3">お名前</th>
-                        <th class="p-4 font-bold">メモ・特徴</th>
-                      </tr>
-                    </thead>
-                    <tbody>${custRows}</tbody>
-                  </table>
+                  <table class="w-full text-left min-w-[300px]"><thead class="bg-[#E8F0EC] text-[#111111] border-b-2 border-[#0F543C]"><tr><th class="p-4 font-bold w-1/3">お名前</th><th class="p-4 font-bold">メモ・特徴</th></tr></thead><tbody>${custRows}</tbody></table>
                 </div>
               </div>
             </div>
@@ -881,41 +847,30 @@
     function getModalsHTML() {
       let html = '';
 
-      // --- 注文カスタマイズ用モーダル ---
       if (state.customizingItem) {
         const { item } = state.customizingItem;
         html += `
           <div class="fixed inset-0 bg-black/80 z-[110] flex items-center justify-center p-4 print:hidden" role="dialog" aria-modal="true">
             <div class="bg-white rounded-xl shadow-2xl max-w-md w-full overflow-hidden border-4 border-[#0F543C]">
               <div class="bg-[#0F543C] p-4 flex justify-between items-center text-white">
-                <h2 class="font-bold text-xl flex items-center">
-                  <i data-lucide="sliders-horizontal" class="w-6 h-6 mr-2" aria-hidden="true"></i>
-                  注文オプション
-                </h2>
+                <h2 class="font-bold text-xl flex items-center"><i data-lucide="sliders-horizontal" class="w-6 h-6 mr-2" aria-hidden="true"></i> 注文オプション</h2>
               </div>
-              
               <div class="p-6 bg-[#F4F7F5] border-b-2 border-[#CCCCCC]">
                 <div class="text-sm font-bold text-[#444444] mb-1">${item.category}</div>
                 <div class="text-2xl font-black text-[#111111]">${item.name}</div>
                 <div class="text-[#0F543C] font-bold text-xl mt-1">基本価格: ¥${item.price.toLocaleString()}</div>
               </div>
-
               <div class="p-6 space-y-6">
-                <!-- 備考 -->
                 <div>
                   <label class="block font-bold text-[#111111] mb-2" for="cust-note">備考 (トッピング、要望など)</label>
-                  <input type="text" id="cust-note" placeholder="例: トマト抜き、辛め、等" class="w-full border-2 border-[#CCCCCC] rounded-lg p-3 text-lg font-bold focus:outline-none focus:border-[#0F543C] focus:ring-2 focus:ring-[#0F543C]">
+                  <input type="text" id="cust-note" placeholder="例: トマト抜き、辛め、等" class="w-full border-2 border-[#CCCCCC] rounded-lg p-3 text-lg font-bold focus:outline-none focus:border-[#0F543C]">
                 </div>
-                
-                <!-- 追加料金 -->
                 <div>
                   <label class="block font-bold text-[#111111] mb-2" for="cust-extra">追加料金 (円)</label>
                   <div class="flex items-center space-x-2">
                     <span class="font-bold text-xl">¥</span>
-                    <input type="number" id="cust-extra" value="0" class="w-full border-2 border-[#CCCCCC] rounded-lg p-3 text-lg font-bold focus:outline-none focus:border-[#0F543C] focus:ring-2 focus:ring-[#0F543C]">
+                    <input type="number" id="cust-extra" value="0" class="w-full border-2 border-[#CCCCCC] rounded-lg p-3 text-lg font-bold focus:outline-none focus:border-[#0F543C]">
                   </div>
-                  
-                  <!-- クイックボタン -->
                   <div class="flex space-x-2 mt-3">
                     <button onclick="window.setExtraCharge(0)" class="px-4 py-2 bg-white border-2 border-[#CCCCCC] rounded-lg font-bold hover:bg-[#EEEEEE] text-[#444444]">+0</button>
                     <button onclick="window.setExtraCharge(50)" class="px-4 py-2 bg-[#E8F0EC] border-2 border-[#0F543C] rounded-lg font-bold hover:bg-[#D1E2D9] text-[#0F543C]">+50</button>
@@ -924,19 +879,15 @@
                   </div>
                 </div>
               </div>
-
               <div class="p-4 bg-[#F8F9FA] border-t-2 border-[#CCCCCC] flex space-x-3">
                 <button onclick="window.closeCustomizeModal()" class="flex-1 py-4 min-h-[44px] border-2 border-[#777777] text-[#222222] font-bold text-lg rounded-xl hover:bg-[#EEEEEE] focus:outline-none focus:ring-4 focus:ring-[#0F543C]">キャンセル</button>
-                <button onclick="window.confirmCustomizedOrder()" class="flex-1 py-4 min-h-[44px] bg-[#0F543C] text-white font-bold text-lg rounded-xl hover:bg-[#0A3D2B] shadow-md border-2 border-transparent focus:outline-none focus:ring-4 focus:ring-[#FFC700] flex items-center justify-center">
-                  <i data-lucide="shopping-cart" class="w-5 h-5 mr-2"></i>カートに追加
-                </button>
+                <button onclick="window.confirmCustomizedOrder()" class="flex-1 py-4 min-h-[44px] bg-[#0F543C] text-white font-bold text-lg rounded-xl hover:bg-[#0A3D2B] shadow-md border-2 border-transparent focus:outline-none focus:ring-4 focus:ring-[#FFC700] flex items-center justify-center"><i data-lucide="shopping-cart" class="w-5 h-5 mr-2"></i>カートに追加</button>
               </div>
             </div>
           </div>
         `;
       }
 
-      // --- 監査パネル・設定用モーダル群 ---
       if (state.isAuditPanelOpen) {
         html += `<div class="fixed inset-0 bg-black/80 z-[100] flex items-center justify-center p-4 print:hidden" role="dialog" aria-modal="true" aria-labelledby="audit-panel-title"><div class="bg-white rounded-xl shadow-2xl max-w-2xl w-full overflow-hidden flex flex-col border-4 border-[#0F543C]"><div class="bg-[#0F543C] p-5 flex justify-between items-center text-white"><h2 id="audit-panel-title" class="font-bold text-2xl flex items-center"><i data-lucide="shield-check" class="w-7 h-7 mr-3" aria-hidden="true"></i> アクセシビリティ監査パネル</h2><button onclick="window.setIsAuditPanelOpen(false)" aria-label="監査パネルを閉じる" class="text-white hover:bg-[#146c4d] p-2 rounded-lg transition-colors focus:outline-none focus:ring-4 focus:ring-[#FFC700] min-h-[44px] min-w-[44px] flex items-center justify-center border-2 border-transparent focus:border-white"><i data-lucide="x" class="w-7 h-7" aria-hidden="true"></i></button></div><div class="p-8 overflow-y-auto max-h-[70vh] text-[#111111]"><p class="mb-6 font-bold text-xl border-b-4 border-[#FFC700] pb-3">JIS X 8341-3:2016 / WCAG 2.2 AAA 達成基準への対応状況</p><ul class="space-y-6"><li class="flex items-start"><i data-lucide="circle-check" class="text-[#0F543C] mr-4 mt-1 shrink-0 w-7 h-7" aria-hidden="true"></i><div><strong class="block text-xl mb-1 text-[#0F543C]">1. コントラスト (AAA達成)</strong><span class="text-base font-medium text-[#222222]">文字と背景のコントラスト比 7:1 以上を厳格に確保するUDカラー（深い緑 \`#0F543C\` とひまわり色 \`#FFC700\`）を採用。</span></div></li><li class="flex items-start"><i data-lucide="circle-check" class="text-[#0F543C] mr-4 mt-1 shrink-0 w-7 h-7" aria-hidden="true"></i><div><strong class="block text-xl mb-1 text-[#0F543C]">2. ターゲットサイズ (WCAG 2.2 AAA基準)</strong><span class="text-base font-medium text-[#222222]">全てのボタン、リンク、操作要素は最小でも 44x44 ピクセルのクリック可能な領域を確保しています。</span></div></li><li class="flex items-start"><i data-lucide="circle-check" class="text-[#0F543C] mr-4 mt-1 shrink-0 w-7 h-7" aria-hidden="true"></i><div><strong class="block text-xl mb-1 text-[#0F543C]">3. キーボード操作とフォーカス</strong><span class="text-base font-medium text-[#222222]">マウスを使わず、キーボードのみで操作可能。現在操作中の場所が明確にわかるよう、高コントラストなフォーカスリングを表示します。</span></div></li><li class="flex items-start"><i data-lucide="circle-check" class="text-[#0F543C] mr-4 mt-1 shrink-0 w-7 h-7" aria-hidden="true"></i><div><strong class="block text-xl mb-1 text-[#0F543C]">4. スクリーンリーダー対応 (ARIA)</strong><span class="text-base font-medium text-[#222222]">装飾用アイコンの隠蔽や、アイコンのみのボタンへの代替テキスト (\`aria-label\`) などを適切に設定しています。</span></div></li></ul></div><div class="p-5 bg-[#F8F9FA] border-t-2 border-[#CCCCCC] flex justify-end"><button onclick="window.setIsAuditPanelOpen(false)" class="px-8 py-3 bg-[#0F543C] text-white font-bold text-lg rounded-xl hover:bg-[#146c4d] focus:outline-none focus:ring-4 focus:ring-[#FFC700] min-h-[44px] shadow-md border-2 border-transparent">パネルを閉じる</button></div></div></div>`;
       }
@@ -944,12 +895,9 @@
       if (state.editingMenu) {
         let catOptions = '';
         CATEGORIES.forEach(c => {
-          if (c !== 'すべて') {
-            const selected = state.editingMenu.category === c ? 'selected' : '';
-            catOptions += `<option value="${c}" ${selected}>${c}</option>`;
-          }
+          if (c !== 'すべて') catOptions += `<option value="${c}" ${state.editingMenu.category === c ? 'selected' : ''}>${c}</option>`;
         });
-        html += `<div class="fixed inset-0 bg-black/80 z-[110] flex items-center justify-center p-4 print:hidden" role="dialog" aria-modal="true"><div class="bg-white rounded-xl shadow-2xl max-w-md w-full overflow-hidden border-4 border-[#0F543C]"><div class="bg-[#0F543C] p-4 flex justify-between items-center text-white"><h2 class="font-bold text-xl flex items-center"><i data-lucide="${state.editingMenu.id ? 'pencil' : 'plus'}" class="w-6 h-6 mr-2" aria-hidden="true"></i> ${state.editingMenu.id ? 'メニューを編集' : '新規メニュー追加'}</h2></div><div class="p-6 space-y-4"><div><label class="block font-bold text-[#111111] mb-2" for="modal-menu-name">商品名</label><input type="text" id="modal-menu-name" value="${state.editingMenu.name}" placeholder="例: ペペロンチーノ" class="w-full border-2 border-[#CCCCCC] rounded-lg p-3 text-lg font-bold focus:outline-none focus:border-[#0F543C] focus:ring-2 focus:ring-[#0F543C]"></div><div><label class="block font-bold text-[#111111] mb-2" for="modal-menu-price">価格 (円)</label><input type="number" id="modal-menu-price" value="${state.editingMenu.price}" class="w-full border-2 border-[#CCCCCC] rounded-lg p-3 text-lg font-bold focus:outline-none focus:border-[#0F543C] focus:ring-2 focus:ring-[#0F543C]"></div><div><label class="block font-bold text-[#111111] mb-2" for="modal-menu-category">カテゴリ</label><select id="modal-menu-category" class="w-full border-2 border-[#CCCCCC] rounded-lg p-3 text-lg font-bold focus:outline-none focus:border-[#0F543C] focus:ring-2 focus:ring-[#0F543C]">${catOptions}</select></div></div><div class="p-4 bg-[#F8F9FA] border-t-2 border-[#CCCCCC] flex space-x-3"><button onclick="state.editingMenu = null; render();" class="flex-1 py-3 min-h-[44px] border-2 border-[#777777] text-[#222222] font-bold rounded-xl hover:bg-[#EEEEEE] focus:outline-none focus:ring-4 focus:ring-[#0F543C]">キャンセル</button><button onclick="window.saveMenu()" class="flex-1 py-3 min-h-[44px] bg-[#0F543C] text-white font-bold rounded-xl hover:bg-[#0A3D2B] shadow-md border-2 border-transparent focus:outline-none focus:ring-4 focus:ring-[#FFC700]">保存する</button></div></div></div>`;
+        html += `<div class="fixed inset-0 bg-black/80 z-[110] flex items-center justify-center p-4 print:hidden" role="dialog" aria-modal="true"><div class="bg-white rounded-xl shadow-2xl max-w-md w-full overflow-hidden border-4 border-[#0F543C]"><div class="bg-[#0F543C] p-4 flex justify-between items-center text-white"><h2 class="font-bold text-xl flex items-center"><i data-lucide="${state.editingMenu.id ? 'pencil' : 'plus'}" class="w-6 h-6 mr-2" aria-hidden="true"></i> ${state.editingMenu.id ? 'メニューを編集' : '新規メニュー追加'}</h2></div><div class="p-6 space-y-4"><div><label class="block font-bold text-[#111111] mb-2" for="modal-menu-name">商品名</label><input type="text" id="modal-menu-name" value="${state.editingMenu.name}" class="w-full border-2 border-[#CCCCCC] rounded-lg p-3 text-lg font-bold focus:outline-none focus:border-[#0F543C]"></div><div><label class="block font-bold text-[#111111] mb-2" for="modal-menu-price">価格 (円)</label><input type="number" id="modal-menu-price" value="${state.editingMenu.price}" class="w-full border-2 border-[#CCCCCC] rounded-lg p-3 text-lg font-bold focus:outline-none focus:border-[#0F543C]"></div><div><label class="block font-bold text-[#111111] mb-2" for="modal-menu-category">カテゴリ</label><select id="modal-menu-category" class="w-full border-2 border-[#CCCCCC] rounded-lg p-3 text-lg font-bold focus:outline-none focus:border-[#0F543C]">${catOptions}</select></div></div><div class="p-4 bg-[#F8F9FA] border-t-2 border-[#CCCCCC] flex space-x-3"><button onclick="state.editingMenu = null; render();" class="flex-1 py-3 min-h-[44px] border-2 border-[#777777] text-[#222222] font-bold rounded-xl hover:bg-[#EEEEEE] focus:outline-none focus:ring-4 focus:ring-[#0F543C]">キャンセル</button><button onclick="window.saveMenu()" class="flex-1 py-3 min-h-[44px] bg-[#0F543C] text-white font-bold rounded-xl hover:bg-[#0A3D2B] shadow-md border-2 border-transparent focus:outline-none focus:ring-4 focus:ring-[#FFC700]">保存する</button></div></div></div>`;
       }
 
       if (state.deletingMenuId) {
@@ -960,7 +908,7 @@
       }
 
       if (state.isCustomerModalOpen) {
-        html += `<div class="fixed inset-0 bg-black/80 z-[110] flex items-center justify-center p-4 print:hidden" role="dialog" aria-modal="true"><div class="bg-white rounded-xl shadow-2xl max-w-md w-full overflow-hidden border-4 border-[#0F543C]"><div class="bg-[#0F543C] p-4 flex justify-between items-center text-white"><h2 class="font-bold text-xl flex items-center"><i data-lucide="user-plus" class="w-6 h-6 mr-2" aria-hidden="true"></i> お得意様登録</h2></div><div class="p-6 space-y-4"><div><label class="block font-bold text-[#111111] mb-2" for="modal-cust-name">お名前</label><input type="text" id="modal-cust-name" placeholder="例: 山田様" class="w-full border-2 border-[#CCCCCC] rounded-lg p-3 text-lg font-bold focus:outline-none focus:border-[#0F543C] focus:ring-2 focus:ring-[#0F543C]"></div><div><label class="block font-bold text-[#111111] mb-2" for="modal-cust-note">メモ・特徴</label><textarea id="modal-cust-note" placeholder="例: 赤ワインが好き、辛さ控えめ希望 など" rows="3" class="w-full border-2 border-[#CCCCCC] rounded-lg p-3 text-lg font-bold focus:outline-none focus:border-[#0F543C] focus:ring-2 focus:ring-[#0F543C]"></textarea></div></div><div class="p-4 bg-[#F8F9FA] border-t-2 border-[#CCCCCC] flex space-x-3"><button onclick="window.setIsCustomerModalOpen(false)" class="flex-1 py-3 min-h-[44px] border-2 border-[#777777] text-[#222222] font-bold rounded-xl hover:bg-[#EEEEEE] focus:outline-none focus:ring-4 focus:ring-[#0F543C]">キャンセル</button><button onclick="window.saveCustomer()" class="flex-1 py-3 min-h-[44px] bg-[#0F543C] text-white font-bold rounded-xl hover:bg-[#0A3D2B] shadow-md border-2 border-transparent focus:outline-none focus:ring-4 focus:ring-[#FFC700]">登録する</button></div></div></div>`;
+        html += `<div class="fixed inset-0 bg-black/80 z-[110] flex items-center justify-center p-4 print:hidden" role="dialog" aria-modal="true"><div class="bg-white rounded-xl shadow-2xl max-w-md w-full overflow-hidden border-4 border-[#0F543C]"><div class="bg-[#0F543C] p-4 flex justify-between items-center text-white"><h2 class="font-bold text-xl flex items-center"><i data-lucide="user-plus" class="w-6 h-6 mr-2" aria-hidden="true"></i> お得意様登録</h2></div><div class="p-6 space-y-4"><div><label class="block font-bold text-[#111111] mb-2" for="modal-cust-name">お名前</label><input type="text" id="modal-cust-name" class="w-full border-2 border-[#CCCCCC] rounded-lg p-3 text-lg font-bold focus:outline-none focus:border-[#0F543C]"></div><div><label class="block font-bold text-[#111111] mb-2" for="modal-cust-note">メモ・特徴</label><textarea id="modal-cust-note" rows="3" class="w-full border-2 border-[#CCCCCC] rounded-lg p-3 text-lg font-bold focus:outline-none focus:border-[#0F543C]"></textarea></div></div><div class="p-4 bg-[#F8F9FA] border-t-2 border-[#CCCCCC] flex space-x-3"><button onclick="window.setIsCustomerModalOpen(false)" class="flex-1 py-3 min-h-[44px] border-2 border-[#777777] text-[#222222] font-bold rounded-xl hover:bg-[#EEEEEE] focus:outline-none focus:ring-4 focus:ring-[#0F543C]">キャンセル</button><button onclick="window.saveCustomer()" class="flex-1 py-3 min-h-[44px] bg-[#0F543C] text-white font-bold rounded-xl hover:bg-[#0A3D2B] shadow-md border-2 border-transparent focus:outline-none focus:ring-4 focus:ring-[#FFC700]">登録する</button></div></div></div>`;
       }
 
       if (state.printContent) {
@@ -973,54 +921,18 @@
             let noteHTML = o.note ? `<div class="text-[#D32F2F] text-xs font-bold mt-1">【${o.note}】</div>` : '';
             itemsHTML += `<li class="border-b-2 border-dashed border-[#CCCCCC] py-2"><div class="flex justify-between items-center"><span class="font-bold text-base">${o.item.name}</span><span class="font-bold text-base">x ${o.qty}</span></div>${noteHTML}</li>`;
           });
-          innerPreview = `
-            <h2 class="text-xl font-bold text-center border-b-2 border-black pb-2 mb-4">厨房伝票</h2>
-            <div class="text-lg font-bold mb-2">テーブル: ${data.table}</div>
-            <div class="mb-4 text-gray-800 font-bold">${formatTime(data.time)}</div>
-            <ul class="mb-8 border-t-2 border-b-2 border-black py-2">
-              ${itemsHTML}
-            </ul>
-          `;
+          innerPreview = `<h2 class="text-xl font-bold text-center border-b-2 border-black pb-2 mb-4">厨房伝票</h2><div class="text-lg font-bold mb-2">テーブル: ${data.table}</div><div class="mb-4 text-gray-800 font-bold">${formatTime(data.time)}</div><ul class="mb-8 border-t-2 border-b-2 border-black py-2">${itemsHTML}</ul>`;
         } else if (type === 'receipt') {
           let itemsHTML = '';
           data.items.forEach(o => {
             const unitPrice = o.item.price + (o.extraCharge || 0);
-            let subText = '';
-            if (o.note || o.extraCharge) {
-              subText = `<div class="text-[10px] text-gray-600 pl-2">(${o.note ? o.note : ''}${o.note && o.extraCharge ? ', ' : ''}${o.extraCharge ? '+¥'+o.extraCharge : ''})</div>`;
-            }
+            let subText = o.note || o.extraCharge ? `<div class="text-[10px] text-gray-600 pl-2">(${o.note ? o.note : ''}${o.note && o.extraCharge ? ', ' : ''}${o.extraCharge ? '+¥'+o.extraCharge : ''})</div>` : '';
             itemsHTML += `<div class="mb-1"><div class="flex justify-between"><span>${o.item.name} x${o.qty}</span><span>¥${(unitPrice * o.qty).toLocaleString()}</span></div>${subText}</div>`;
           });
-          innerPreview = `
-            <div class="text-center mb-6">
-              <h2 class="text-xl font-bold mb-1 system-name">${state.storeInfo.name}</h2>
-              <p class="text-xs font-bold">${state.storeInfo.address}</p>
-              <p class="text-xs font-bold">${state.storeInfo.tel}</p>
-            </div>
-            <div class="flex justify-between text-xs font-bold mb-4">
-              <span>卓: ${data.table}</span>
-              <span>${formatTime(data.time)}</span>
-            </div>
-            <div class="border-t-2 border-b-2 border-dashed border-gray-600 py-3 mb-4 space-y-1 text-xs font-bold">
-              ${itemsHTML}
-            </div>
-            <div class="flex justify-between text-xs font-bold mb-1">
-              <span>小計</span><span>¥${data.subtotal.toLocaleString()}</span>
-            </div>
-            <div class="flex justify-between text-xs font-bold mb-2">
-              <span>消費税(10%)</span><span>¥${data.tax.toLocaleString()}</span>
-            </div>
-            <div class="flex justify-between font-black text-base mt-2 border-t-2 border-black pt-2">
-              <span>合計</span><span>¥${data.total.toLocaleString()}</span>
-            </div>
-            <div class="text-center mt-6 text-xs font-bold whitespace-pre-line text-[#444444]">
-              ${state.storeInfo.message}
-            </div>
-          `;
+          innerPreview = `<div class="text-center mb-6"><h2 class="text-xl font-bold mb-1 system-name">${state.storeInfo.name}</h2><p class="text-xs font-bold">${state.storeInfo.address}</p><p class="text-xs font-bold">${state.storeInfo.tel}</p></div><div class="flex justify-between text-xs font-bold mb-4"><span>卓: ${data.table}</span><span>${formatTime(data.time)}</span></div><div class="border-t-2 border-b-2 border-dashed border-gray-600 py-3 mb-4 space-y-1 text-xs font-bold">${itemsHTML}</div><div class="flex justify-between text-xs font-bold mb-1"><span>小計</span><span>¥${data.subtotal.toLocaleString()}</span></div><div class="flex justify-between text-xs font-bold mb-2"><span>消費税(10%)</span><span>¥${data.tax.toLocaleString()}</span></div><div class="flex justify-between font-black text-base mt-2 border-t-2 border-black pt-2"><span>合計</span><span>¥${data.total.toLocaleString()}</span></div><div class="text-center mt-6 text-xs font-bold whitespace-pre-line text-[#444444]">${state.storeInfo.message}</div>`;
         }
 
         const titleText = type === 'kitchen' ? '厨房伝票プレビュー' : 'レシートプレビュー';
-
         html += `<div class="fixed inset-0 bg-black/80 z-[90] flex items-center justify-center p-4 print:hidden" role="dialog" aria-modal="true" aria-label="印刷プレビュー"><div class="bg-white rounded-2xl shadow-2xl max-w-sm w-full overflow-hidden flex flex-col max-h-[90vh] border-2 border-[#CCCCCC]"><div class="bg-[#E8F0EC] p-4 border-b-2 border-[#CCCCCC] flex justify-between items-center"><h3 class="font-bold text-xl text-[#0F543C]">${titleText}</h3><button onclick="window.closePrintModal()" aria-label="プレビューを閉じる" class="text-[#444444] hover:text-[#111111] focus:outline-none focus:ring-4 focus:ring-[#0F543C] rounded-lg p-2 min-h-[44px] min-w-[44px] flex items-center justify-center"><i data-lucide="x" class="w-7 h-7" aria-hidden="true"></i></button></div><div class="p-6 overflow-y-auto bg-[#F4F7F5] flex-1"><div class="bg-white p-6 shadow-sm border-2 border-[#DDDDDD] mx-auto w-[300px] min-h-[400px]" aria-hidden="true"><div class="font-mono text-sm text-black">${innerPreview}</div></div></div><div class="p-4 bg-white border-t-2 border-[#CCCCCC] flex space-x-3"><button onclick="window.closePrintModal()" class="flex-1 py-3 min-h-[44px] border-2 border-[#777777] text-[#222222] font-bold rounded-xl hover:bg-[#EEEEEE] focus:outline-none focus:ring-4 focus:ring-[#0F543C]">キャンセル</button><button onclick="window.handlePrint()" class="flex-1 py-3 min-h-[44px] bg-[#0F543C] text-white font-bold rounded-xl hover:bg-[#0A3D2B] flex items-center justify-center space-x-2 shadow-md border-2 border-transparent focus:outline-none focus:ring-4 focus:ring-[#FFC700] focus:ring-offset-2"><i data-lucide="printer" class="w-5 h-5" aria-hidden="true"></i><span>印刷する</span></button></div></div></div>`;
       }
 
@@ -1037,60 +949,58 @@
           let noteHTML = o.note ? `<div class="text-xs font-bold mt-1">【${o.note}】</div>` : '';
           itemsHTML += `<li class="border-b border-dashed border-black py-2"><div class="flex justify-between items-center text-lg"><span>${o.item.name}</span><span class="font-bold">x ${o.qty}</span></div>${noteHTML}</li>`;
         });
-        return `
-          <div class="max-w-xs mx-auto">
-            <h2 class="text-2xl font-bold text-center border-b-2 border-black pb-2 mb-4">厨房伝票</h2>
-            <div class="text-xl font-bold mb-2">テーブル: ${data.table}</div>
-            <div class="mb-4 text-gray-600">${formatTime(data.time)}</div>
-            <ul class="mb-8 border-t-2 border-b-2 border-black py-2">
-              ${itemsHTML}
-            </ul>
-            <div class="text-center text-xs mt-8">-------------</div>
-          </div>
-        `;
+        return `<div class="max-w-xs mx-auto"><h2 class="text-2xl font-bold text-center border-b-2 border-black pb-2 mb-4">厨房伝票</h2><div class="text-xl font-bold mb-2">テーブル: ${data.table}</div><div class="mb-4 text-gray-600">${formatTime(data.time)}</div><ul class="mb-8 border-t-2 border-b-2 border-black py-2">${itemsHTML}</ul><div class="text-center text-xs mt-8">-------------</div></div>`;
       } else if (type === 'receipt') {
         let itemsHTML = '';
         data.items.forEach(o => {
           const unitPrice = o.item.price + (o.extraCharge || 0);
-          let subText = '';
-          if (o.note || o.extraCharge) {
-            subText = `<div class="text-[10px] text-gray-500 pl-2">(${o.note ? o.note : ''}${o.note && o.extraCharge ? ', ' : ''}${o.extraCharge ? '+¥'+o.extraCharge : ''})</div>`;
-          }
+          let subText = o.note || o.extraCharge ? `<div class="text-[10px] text-gray-500 pl-2">(${o.note ? o.note : ''}${o.note && o.extraCharge ? ', ' : ''}${o.extraCharge ? '+¥'+o.extraCharge : ''})</div>` : '';
           itemsHTML += `<div class="mb-1"><div class="flex justify-between"><span>${o.item.name} <span class="text-xs text-gray-500">x${o.qty}</span></span><span>¥${(unitPrice * o.qty).toLocaleString()}</span></div>${subText}</div>`;
         });
-        return `
-          <div class="max-w-sm mx-auto">
-            <div class="text-center mb-6">
-              <h2 class="text-2xl font-bold mb-1 system-name">${state.storeInfo.name}</h2>
-              <p class="text-xs text-gray-600">${state.storeInfo.address}</p>
-              <p class="text-xs text-gray-600">TEL: ${state.storeInfo.tel}</p>
-            </div>
-            <div class="flex justify-between text-sm mb-4">
-              <span>テーブル: ${data.table}</span><span>${formatDateTime(data.time)}</span>
-            </div>
-            <div class="border-t border-b border-dashed border-gray-400 py-4 mb-4">
-              ${itemsHTML}
-            </div>
-            <div class="flex justify-between mb-1 text-sm text-gray-600">
-              <span>小計</span><span>¥${data.subtotal.toLocaleString()}</span>
-            </div>
-            <div class="flex justify-between mb-2 text-sm text-gray-600">
-              <span>消費税 (10%)</span><span>¥${data.tax.toLocaleString()}</span>
-            </div>
-            <div class="flex justify-between font-bold text-xl mt-2 border-t border-black pt-2">
-              <span>合計</span><span>¥${data.total.toLocaleString()}</span>
-            </div>
-            <div class="text-center mt-8 text-sm whitespace-pre-line">
-              ${state.storeInfo.message}
-            </div>
-          </div>
-        `;
+        return `<div class="max-w-sm mx-auto"><div class="text-center mb-6"><h2 class="text-2xl font-bold mb-1 system-name">${state.storeInfo.name}</h2><p class="text-xs text-gray-600">${state.storeInfo.address}</p><p class="text-xs text-gray-600">TEL: ${state.storeInfo.tel}</p></div><div class="flex justify-between text-sm mb-4"><span>テーブル: ${data.table}</span><span>${formatDateTime(data.time)}</span></div><div class="border-t border-b border-dashed border-gray-400 py-4 mb-4">${itemsHTML}</div><div class="flex justify-between mb-1 text-sm text-gray-600"><span>小計</span><span>¥${data.subtotal.toLocaleString()}</span></div><div class="flex justify-between mb-2 text-sm text-gray-600"><span>消費税 (10%)</span><span>¥${data.tax.toLocaleString()}</span></div><div class="flex justify-between font-bold text-xl mt-2 border-t border-black pt-2"><span>合計</span><span>¥${data.total.toLocaleString()}</span></div><div class="text-center mt-8 text-sm whitespace-pre-line">${state.storeInfo.message}</div></div>`;
       }
       return '';
     }
 
     // --- メインレンダリング処理 ---
     function render() {
+      // 1. 未ログインの場合
+      if (!currentUser && typeof __initial_auth_token === 'undefined') {
+        document.getElementById('app-container').classList.add('hidden');
+        document.getElementById('pending-container').classList.add('hidden');
+        document.getElementById('login-container').classList.remove('hidden');
+        document.getElementById('login-container').innerHTML = getLoginHTML();
+        lucide.createIcons();
+        return;
+      }
+
+      // 2. 権限チェック
+      const email = currentUser?.email;
+      const isAdmin = !email || email === state.adminEmail; // Canvasなどのテスト環境、または管理者
+      const isAllowed = isAdmin || state.allowedEmails.includes(email);
+
+      // 3. 権限がない（承認待ち）の場合
+      if (!isAllowed) {
+        // まだ申請リストに入っていなければ追加する
+        if (!state.pendingEmails.includes(email) && !pendingRequestSent) {
+          state.pendingEmails.push(email);
+          saveToFirebase();
+          pendingRequestSent = true;
+        }
+        
+        document.getElementById('app-container').classList.add('hidden');
+        document.getElementById('login-container').classList.add('hidden');
+        document.getElementById('pending-container').classList.remove('hidden');
+        document.getElementById('pending-container').innerHTML = getPendingHTML();
+        lucide.createIcons();
+        return;
+      }
+
+      // 4. 権限がある場合は通常アプリ画面を表示
+      document.getElementById('login-container').classList.add('hidden');
+      document.getElementById('pending-container').classList.add('hidden');
+      document.getElementById('app-container').classList.remove('hidden');
+
       const activeElementId = document.activeElement ? document.activeElement.id : null;
 
       document.getElementById('header-container').innerHTML = getHeaderHTML();
@@ -1102,20 +1012,14 @@
 
       if (activeElementId) {
         const elToFocus = document.getElementById(activeElementId);
-        if (elToFocus) {
-          setTimeout(() => elToFocus.focus(), 0);
-        }
+        if (elToFocus) setTimeout(() => elToFocus.focus(), 0);
       }
-
-      // レンダリング（状態変更）のたびに、ローカルストレージに自動保存する
-      saveToLocalStorage();
     }
 
-    document.addEventListener("DOMContentLoaded", () => {
-      // 初期起動時にローカルストレージのデータを読み込む
-      loadFromLocalStorage();
-      render();
-    });
+    // Canvas環境以外では初期表示用にrenderを一度呼ぶ
+    if (typeof __initial_auth_token === 'undefined') {
+      document.addEventListener("DOMContentLoaded", render);
+    }
   </script>
 </body>
 </html>
