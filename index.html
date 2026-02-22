@@ -8,7 +8,6 @@
   <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
   
-  <!-- Tailwind CSSの設定 -->
   <script>
     tailwind.config = {
       theme: {
@@ -25,11 +24,10 @@
   <script src="https://unpkg.com/lucide@latest"></script>
   
   <style>
-    /* LINE Seed JP フォントの読み込み */
     @import url('https://cdn.jsdelivr.net/npm/@line/seed@1.0.0/app/css/seed.css');
     
     body {
-      touch-action: manipulation; /* ダブルタップズームを防止 */
+      touch-action: manipulation;
     }
 
     .system-name {
@@ -37,68 +35,49 @@
       font-weight: 800;
     }
 
-    /* 印刷時の設定 */
     @media print {
       .no-print { display: none !important; }
-      body { background: white; }
+      body { background: white; padding: 0; margin: 0; }
     }
 
-    /* カスタムスクロールバー（UD意識） */
-    ::-webkit-scrollbar { width: 10px; height: 10px; }
-    ::-webkit-scrollbar-track { background: #F1F1F1; }
-    ::-webkit-scrollbar-thumb { background: #0F543C; border-radius: 5px; }
+    /* 横スクロールバー非表示（メニューカテゴリ用） */
+    .no-scrollbar::-webkit-scrollbar { display: none; }
+    .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
   </style>
 </head>
-<body class="min-h-screen bg-[#F4F7F5] font-sans print:bg-white text-[#111111] flex flex-col">
+<body class="min-h-screen bg-[#F4F7F5] font-sans print:bg-white text-[#111111] flex flex-col overflow-hidden">
 
-  <!-- 初期ロード/エラー画面 -->
+  <!-- 初期ロード画面 -->
   <div id="initial-loading" class="fixed inset-0 z-[200] flex flex-col items-center justify-center bg-[#F4F7F5] p-6 text-center">
     <div class="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-[#0F543C] mb-6"></div>
-    <p class="font-bold text-[#0F543C] text-2xl mb-2">システムを準備しています...</p>
+    <p class="font-bold text-[#0F543C] text-2xl mb-2 tracking-tighter">BuonContoを起動中...</p>
     <div class="bg-white p-6 rounded-2xl border-2 border-[#CCCCCC] max-w-lg text-sm text-[#444444] font-bold leading-relaxed mt-4 shadow-md text-left overflow-y-auto max-h-[60vh]">
-      <p class="mb-3 text-[#D32F2F] text-base"><i data-lucide="info" class="w-5 h-5 inline-block -mt-1 mr-1"></i> 起動しない場合のチェックリスト</p>
-      <div class="space-y-4">
-        <div>
-          <p class="font-black text-[#111111]">1. Firebaseの設定 (index.html内)</p>
-          <p>コード内の <code>DEFAULT_FIREBASE_CONFIG</code> をご自身のAPIキーに書き換えましたか？</p>
-        </div>
-        <div>
-          <p class="font-black text-[#111111]">2. 【重要】ドメイン認証の設定</p>
-          <p>GitHub Pagesなどの外部URLで動かす場合、Firebaseコンソールで許可設定が必要です：</p>
-          <ol class="list-decimal pl-5 mt-1 text-xs">
-            <li>Firebaseコンソール ＞ Authentication ＞ Settings ＞ <strong>「承認済みドメイン」</strong> を開く</li>
-            <li>「ドメインの追加」を押し、GitHub Pagesのドメイン（例: <code>あなたの名前.github.io</code>）を入力して保存してください。</li>
-          </ol>
-        </div>
-      </div>
+      <p class="mb-3 text-[#D32F2F] text-base"><i data-lucide="info" class="w-5 h-5 inline-block -mt-1 mr-1"></i> ドメイン認証について</p>
+      <p class="text-xs mb-4">GitHub Pages等で公開する場合、Firebaseコンソールの [Authentication] > [Settings] > [承認済みドメイン] に、サイトのURL（例: <code>username.github.io</code>）を追加してください。</p>
     </div>
   </div>
 
-  <!-- ログイン画面 -->
-  <div id="login-container" class="hidden fixed inset-0 z-[150] flex flex-col items-center justify-center bg-[#0F543C] p-4"></div>
+  <!-- ログイン・承認待ちコンテナ -->
+  <div id="auth-overlay" class="hidden fixed inset-0 z-[150] flex flex-col items-center justify-center bg-[#0F543C] p-4 overflow-y-auto"></div>
 
-  <!-- 承認待ち画面 -->
-  <div id="pending-container" class="hidden fixed inset-0 z-[150] flex flex-col items-center justify-center bg-[#0F543C] p-4"></div>
-
-  <!-- アプリ本体 -->
+  <!-- メインアプリ -->
   <div id="app-container" class="hidden flex-col flex-1 h-screen overflow-hidden">
-    
-    <!-- 印刷用ビュー -->
+    <!-- 印刷用 -->
     <div id="print-view-container" class="hidden print:block absolute top-0 left-0 w-full bg-white text-black p-8 font-mono text-sm z-50"></div>
 
     <!-- ヘッダー -->
-    <header id="header-container" class="bg-[#0F543C] text-white p-3 lg:p-4 shadow-md no-print flex flex-col md:flex-row justify-between items-center shrink-0 gap-3" role="banner"></header>
+    <header id="header-container" class="bg-[#0F543C] text-white p-3 lg:p-4 shadow-md no-print flex justify-between items-center shrink-0" role="banner"></header>
 
-    <!-- メインコンテンツ -->
+    <!-- メイン -->
     <main id="main-content" class="flex-1 overflow-hidden no-print flex flex-col relative bg-white lg:bg-[#F4F7F5]"></main>
 
     <!-- フッター -->
-    <footer class="bg-[#0A3D2B] text-white py-3 px-6 text-[10px] lg:text-xs no-print border-t-4 border-[#0F543C] flex justify-between items-center shrink-0" role="contentinfo">
-      <div class="text-[#AAAAAA]">&copy; 2026 Midnight Express Computational Archives</div>
-      <div class="flex flex-col items-end opacity-60 hover:opacity-100 transition-opacity">
-        <img src="mecalogo-white.png" alt="MECAロゴ" class="h-4 lg:h-6 mb-0.5 lg:mb-1 object-contain" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';" />
-        <div class="text-xs lg:text-lg tracking-wider system-name leading-none mb-1 hidden">mecalogo-white</div>
-        <div class="font-bold">しんやせっけいしゃ（MECA）</div>
+    <footer class="bg-[#0A3D2B] text-white py-2 px-6 text-[10px] no-print border-t-2 border-[#0F543C] flex justify-between items-center shrink-0" role="contentinfo">
+      <div class="text-[#AAAAAA] opacity-50">&copy; 2026 MECA</div>
+      <div class="flex items-center gap-2 opacity-60">
+        <img src="mecalogo-white.png" alt="MECA" class="h-4 object-contain" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';" />
+        <span class="hidden system-name">mecalogo-white</span>
+        <span class="font-bold">しんやせっけいしゃ</span>
       </div>
     </footer>
 
@@ -106,14 +85,13 @@
     <div id="modal-container" class="no-print"></div>
   </div>
 
-  <!-- Firebase 統合スクリプト -->
+  <!-- Firebase & Logic -->
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-    import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+    import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
     import { getFirestore, doc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-    // --- Firebase 設定 ---
-    const DEFAULT_FIREBASE_CONFIG = {
+    const firebaseConfig = {
       apiKey: "AIzaSyDBBDoF8VjeAxEDdSUMxsM4c8eAWrdZFTQ",
       authDomain: "buon-poss.firebaseapp.com",
       projectId: "buon-poss",
@@ -122,299 +100,316 @@
       appId: "1:75771144487:web:aa2e0921263edab72d6102"
     };
 
-    const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : DEFAULT_FIREBASE_CONFIG;
-    const appId = typeof __app_id !== 'undefined' ? __app_id : 'buonconto-pos';
-    
-    // 設定チェック
-    if (firebaseConfig.apiKey === "YOUR_API_KEY") {
-      document.getElementById('initial-loading').innerHTML = `<div class="bg-white p-8 rounded-2xl border-4 border-[#D32F2F] shadow-2xl max-w-sm"><i data-lucide="alert-circle" class="w-16 h-16 text-[#D32F2F] mx-auto mb-4"></i><h1 class="text-2xl font-black mb-4">設定が必要です</h1><p class="text-left font-bold text-gray-600">Firebaseの情報をコード内に記述してからアップロードしてください。</p></div>`;
-      lucide.createIcons();
-      throw "Config missing";
-    }
-
     const app = initializeApp(firebaseConfig);
     const auth = getAuth(app);
     const db = getFirestore(app);
+    const appId = 'buon-poss-pos-v1';
 
     let currentUser = null;
     let unsubSnapshot = null;
-    let pendingRequestSent = false;
 
-    // --- 初期データ ---
-    const INITIAL_MENU = [
-      { id: 1, name: 'マルゲリータ', price: 1200, category: 'ピザ' },
-      { id: 2, name: 'クワトロフォルマッジ', price: 1500, category: 'ピザ' },
-      { id: 3, name: 'カルボナーラ', price: 1100, category: 'パスタ' },
-      { id: 4, name: 'ペスカトーレ', price: 1400, category: 'パスタ' },
-      { id: 6, name: '生ハムチーズ盛り', price: 900, category: '前菜' },
-      { id: 7, name: '自家製ティラミス', price: 600, category: 'デザート' },
-      { id: 8, name: 'グラスワイン', price: 500, category: 'ドリンク' },
-      { id: 9, name: '生ビール', price: 600, category: 'ドリンク' },
-      { id: 10, name: 'エスプレッソ', price: 400, category: 'ドリンク' }
-    ];
-
-    const CATEGORIES = ['すべて', 'ピザ', 'パスタ', '前菜', 'デザート', 'ドリンク'];
-    const TABLES = [1, 2, 3, 4, 5, 6];
-
-    // --- アプリ状態 ---
+    // --- State ---
     const state = {
       adminEmail: null,
       allowedEmails: [],
       pendingEmails: [],
       activeTab: 'pos',
-      menu: INITIAL_MENU,
+      menu: [],
       selectedCategory: 'すべて',
       selectedTable: 1,
-      tableOrders: TABLES.reduce((acc, table) => ({ ...acc, [table]: [] }), {}),
+      tableOrders: {},
       kitchenTickets: [],
       salesRecord: [],
-      printContent: null,
-      isAuditPanelOpen: false,
-      customers: [], 
-      editingMenu: null, 
-      isCustomerModalOpen: false, 
-      deletingMenuId: null,
-      customizingItem: null,
-      isMobileCartOpen: false, // スマホ用カート開閉状態
+      customers: [],
       storeInfo: {
-        name: 'BuonConto',
-        address: '東京都板橋区○○ 1-2-3',
-        tel: '03-1234-5678',
-        message: 'ご来店ありがとうございました。\nまたのお越しをお待ちしております。'
+        name: 'BuonConto', address: '東京都板橋区○○ 1-2-3', tel: '03-1234-5678',
+        message: 'ご来店ありがとうございました。'
       },
-      storeInfoSaved: false
+      isMobileCartOpen: false,
+      customizingItem: null,
+      editingMenu: null,
+      deletingMenuId: null,
+      isCustomerModalOpen: false,
+      printContent: null
     };
 
-    // --- Firebase ロジック ---
-    function startFirestoreListener(user) {
-      const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'shared_pos', 'state');
-      unsubSnapshot = onSnapshot(docRef, (snapshot) => {
-        if (snapshot.exists()) {
-          const data = snapshot.data();
+    // --- Firebase Sync ---
+    function startSync(user) {
+      const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'shared', 'state');
+      unsubSnapshot = onSnapshot(docRef, (snap) => {
+        if (snap.exists()) {
+          const data = snap.data();
           Object.assign(state, data);
+          // Convert date strings back to Date objects
           state.salesRecord = (data.salesRecord || []).map(r => ({ ...r, time: new Date(r.time) }));
           state.kitchenTickets = (data.kitchenTickets || []).map(t => ({ ...t, time: new Date(t.time) }));
           render();
         } else {
-          if (user && user.email) state.adminEmail = user.email;
-          saveToFirebase();
+          // Initialize for first admin
+          state.adminEmail = user.email;
+          state.menu = [
+            { id: 1, name: 'マルゲリータ', price: 1200, category: 'ピザ' },
+            { id: 2, name: 'カルボナーラ', price: 1100, category: 'パスタ' }
+          ];
+          [1,2,3,4,5,6].forEach(t => state.tableOrders[t] = []);
+          save();
         }
-      }, (err) => console.error(err));
+      });
     }
 
-    function saveToFirebase() {
+    function save() {
       if (!currentUser) return;
-      const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'shared_pos', 'state');
-      const dataToSave = {
-        ...state,
-        salesRecord: state.salesRecord.map(r => ({ ...r, time: r.time.toISOString() })),
-        kitchenTickets: state.kitchenTickets.map(t => ({ ...t, time: t.time.toISOString() }))
-      };
-      // 不要な一時変数を削除
-      delete dataToSave.isMobileCartOpen;
-      delete dataToSave.printContent;
-      delete dataToSave.customizingItem;
-      delete dataToSave.editingMenu;
-      delete dataToSave.storeInfoSaved;
-      
-      setDoc(docRef, dataToSave).catch(e => console.error(e));
+      const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'shared', 'state');
+      const toSave = { ...state };
+      // Remove UI-only states
+      ['isMobileCartOpen', 'customizingItem', 'editingMenu', 'deletingMenuId', 'isCustomerModalOpen', 'printContent'].forEach(k => delete toSave[k]);
+      // Format dates
+      toSave.salesRecord = state.salesRecord.map(r => ({ ...r, time: r.time.toISOString() }));
+      toSave.kitchenTickets = state.kitchenTickets.map(t => ({ ...t, time: t.time.toISOString() }));
+      setDoc(docRef, toSave).catch(console.error);
     }
 
     onAuthStateChanged(auth, (user) => {
       currentUser = user;
-      if (user) startFirestoreListener(user);
+      if (user) startSync(user);
       else render();
     });
 
-    // --- アクション ---
-    window.handleGoogleLogin = async () => {
-      try { await signInWithPopup(auth, new GoogleAuthProvider()); } catch (e) { alert("ログイン失敗: " + e.message); }
-    };
-    window.handleLogout = () => signOut(auth);
-    window.setActiveTab = (tab) => { state.activeTab = tab; render(); };
-    window.setSelectedTable = (t) => { state.selectedTable = t; state.isMobileCartOpen = false; render(); };
-    window.setIsMobileCartOpen = (isOpen) => { state.isMobileCartOpen = isOpen; render(); };
-    window.closePrintModal = () => { state.printContent = null; render(); };
-    window.openCustomizeModal = (id) => { state.customizingItem = { item: state.menu.find(m => m.id === id), note: '', extraCharge: 0 }; render(); };
-    window.closeCustomizeModal = () => { state.customizingItem = null; render(); };
-    window.confirmOrder = () => {
-      const note = document.getElementById('cust-note')?.value.trim() || '';
-      const extra = parseInt(document.getElementById('cust-extra')?.value || 0);
+    // --- Actions ---
+    window.login = () => signInWithPopup(auth, new GoogleAuthProvider());
+    window.logout = () => signOut(auth);
+    window.setTab = (t) => { state.activeTab = t; render(); };
+    window.setTable = (t) => { state.selectedTable = t; state.isMobileCartOpen = false; render(); };
+    window.toggleCart = (val) => { state.isMobileCartOpen = val; render(); };
+    window.openCust = (id) => { state.customizingItem = { item: state.menu.find(m => m.id === id), note: '', extra: 0 }; render(); };
+    window.closeCust = () => { state.customizingItem = null; render(); };
+    window.addOrder = () => {
+      const note = document.getElementById('c-note')?.value.trim() || '';
+      const extra = parseInt(document.getElementById('c-extra')?.value || 0);
       const item = state.customizingItem.item;
-      const order = state.tableOrders[state.selectedTable];
-      const existing = order.find(o => o.item.id === item.id && o.note === note && o.extraCharge === extra && !o.sentToKitchen);
-      if (existing) existing.qty++;
-      else order.push({ item, qty: 1, note, extraCharge: extra, sentToKitchen: false });
+      const list = state.tableOrders[state.selectedTable] || [];
+      const ex = list.find(o => o.item.id === item.id && o.note === note && o.extra === extra && !o.sent);
+      if (ex) ex.qty++;
+      else list.push({ item, qty: 1, note, extra, sent: false });
+      state.tableOrders[state.selectedTable] = list;
       state.customizingItem = null;
-      render();
-      saveToFirebase();
+      render(); save();
     };
-
-    window.updateQty = (idx, delta) => {
-      const order = state.tableOrders[state.selectedTable];
-      order[idx].qty += delta;
-      if (order[idx].qty <= 0) order.splice(idx, 1);
-      render();
-      saveToFirebase();
+    window.upQty = (i, d) => {
+      const list = state.tableOrders[state.selectedTable];
+      list[i].qty += d;
+      if (list[i].qty <= 0) list.splice(i, 1);
+      render(); save();
     };
-
-    window.checkout = () => {
+    window.sendToK = () => {
       const order = state.tableOrders[state.selectedTable];
-      const sub = order.reduce((s, o) => s + (o.item.price + (o.extraCharge || 0)) * o.qty, 0);
+      const items = order.filter(o => !o.sent);
+      if (items.length === 0) return;
+      const ticket = { id: Date.now(), table: state.selectedTable, time: new Date(), items: items.map(o => ({ ...o })), status: 'pending' };
+      order.forEach(o => o.sent = true);
+      state.kitchenTickets.unshift(ticket);
+      state.printContent = { type: 'kitchen', data: ticket };
+      render(); save();
+    };
+    window.pay = () => {
+      const order = state.tableOrders[state.selectedTable];
+      const sub = order.reduce((s, o) => s + (o.item.price + o.extra) * o.qty, 0);
       const tax = Math.floor(sub * 0.1);
       const receipt = { id: Date.now(), table: state.selectedTable, time: new Date(), items: [...order], subtotal: sub, tax, total: sub + tax };
       state.salesRecord.unshift(receipt);
       state.tableOrders[state.selectedTable] = [];
       state.printContent = { type: 'receipt', data: receipt };
       state.isMobileCartOpen = false;
-      render();
-      saveToFirebase();
+      render(); save();
     };
-
-    window.sendKitchen = () => {
-      const order = state.tableOrders[state.selectedTable];
-      const unsent = order.filter(o => !o.sentToKitchen);
-      const ticket = { id: Date.now(), table: state.selectedTable, time: new Date(), items: unsent.map(o => ({ ...o })), status: 'pending' };
-      order.forEach(o => o.sentToKitchen = true);
-      state.kitchenTickets.unshift(ticket);
-      state.printContent = { type: 'kitchen', data: ticket };
-      render();
-      saveToFirebase();
+    window.doneK = (id) => {
+      const t = state.kitchenTickets.find(x => x.id === id);
+      if (t) t.status = 'done';
+      render(); save();
     };
-
-    window.approveUser = (email) => { 
+    window.approve = (email) => {
       state.pendingEmails = state.pendingEmails.filter(e => e !== email);
-      state.allowedEmails.push(email); 
-      render(); saveToFirebase();
+      state.allowedEmails.push(email);
+      render(); save();
     };
+    window.revoke = (email) => {
+      state.allowedEmails = state.allowedEmails.filter(e => e !== email);
+      render(); save();
+    };
+    window.saveMenu = (e) => {
+      e.preventDefault();
+      const name = document.getElementById('m-name').value;
+      const price = parseInt(document.getElementById('m-price').value);
+      const cat = document.getElementById('m-cat').value;
+      if (state.editingMenu.id) {
+        const idx = state.menu.findIndex(m => m.id === state.editingMenu.id);
+        state.menu[idx] = { id: state.editingMenu.id, name, price, category: cat };
+      } else {
+        state.menu.push({ id: Date.now(), name, price, category: cat });
+      }
+      state.editingMenu = null;
+      render(); save();
+    };
+    window.delMenu = (id) => { state.menu = state.menu.filter(m => m.id !== id); render(); save(); };
 
-    // --- HTMLパーツ ---
-    function getHeaderHTML() {
-      const pcNav = `
-        <nav class="hidden md:flex space-x-1.5 bg-[#0A3D2B] p-1 rounded-lg">
-          ${['pos', 'kitchen', 'sales', 'menu', 'settings'].map(tab => {
-            const labels = {pos:'注文', kitchen:'厨房', sales:'売上', menu:'メニュー', settings:'設定'};
-            const icons = {pos:'calculator', kitchen:'chef-hat', sales:'book-open', menu:'clipboard-list', settings:'settings'};
-            const active = state.activeTab === tab;
-            return `<button onclick="window.setActiveTab('${tab}')" class="px-3 py-1.5 rounded-md flex items-center gap-2 border-2 transition-all ${active ? 'bg-[#FFC700] text-[#111111] border-[#FFC700] font-bold' : 'text-white border-transparent hover:bg-[#146c4d]'}"><i data-lucide="${icons[tab]}" class="w-4 h-4"></i><span>${labels[tab]}</span></button>`;
-          }).join('')}
+    // --- Rendering ---
+    function render() {
+      document.getElementById('initial-loading').classList.add('hidden');
+      const authBox = document.getElementById('auth-overlay');
+      const appBox = document.getElementById('app-container');
+
+      if (!currentUser) {
+        appBox.classList.add('hidden');
+        authBox.classList.remove('hidden');
+        authBox.innerHTML = `
+          <div class="bg-white p-10 rounded-3xl shadow-2xl max-w-md w-full text-center border-4 border-[#0F543C]">
+            <i data-lucide="utensils-crossed" class="w-16 h-16 text-[#0F543C] mx-auto mb-4"></i>
+            <h1 class="text-4xl font-black text-[#0F543C] mb-2 system-name tracking-tighter">BuonConto</h1>
+            <p class="text-gray-500 font-bold mb-8">イタリアンレストランPOS</p>
+            <button onclick="window.login()" class="w-full py-4 bg-white hover:bg-gray-50 border-2 border-[#CCCCCC] rounded-2xl flex items-center justify-center gap-3 font-black text-lg transition-all shadow-sm">
+               <svg class="w-6 h-6" viewBox="0 0 24 24"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/></svg>
+               Googleアカウントでログイン
+            </button>
+          </div>
+        `;
+        lucide.createIcons(); return;
+      }
+
+      const isAllowed = currentUser.email === state.adminEmail || state.allowedEmails.includes(currentUser.email);
+      if (!isAllowed) {
+        if (!state.pendingEmails.includes(currentUser.email)) {
+          state.pendingEmails.push(currentUser.email); save();
+        }
+        appBox.classList.add('hidden');
+        authBox.classList.remove('hidden');
+        authBox.innerHTML = `
+          <div class="bg-white p-10 rounded-3xl text-center max-w-sm border-4 border-[#0F543C]">
+            <i data-lucide="clock" class="w-16 h-16 text-orange-500 mx-auto mb-4 animate-pulse"></i>
+            <h2 class="text-2xl font-black mb-4">利用申請中</h2>
+            <p class="font-bold text-gray-500 mb-8 leading-relaxed text-sm">
+              管理者の承認が必要です。承認されるとこの画面が切り替わります。<br>
+              <span class="text-[#0F543C] underline">※通知は届きませんので、このままお待ちいただくか、後ほど再度アクセスしてください。</span><br>
+              <span class="text-[10px] block mt-2 text-gray-400">ID: ${currentUser.email}</span>
+            </p>
+            <button onclick="window.logout()" class="w-full py-3 bg-gray-100 rounded-xl font-bold">ログアウト</button>
+          </div>
+        `;
+        lucide.createIcons(); return;
+      }
+
+      authBox.classList.add('hidden');
+      appBox.classList.remove('hidden');
+
+      // Header
+      const pendingK = state.kitchenTickets.filter(t => t.status === 'pending').length;
+      const navs = [
+        {id:'pos', label:'注文', icon:'calculator'},
+        {id:'kitchen', label:'厨房', icon:'chef-hat', badge: pendingK},
+        {id:'sales', label:'売上', icon:'book-open'},
+        {id:'menu', label:'商品', icon:'clipboard-list'},
+        {id:'settings', label:'設定', icon:'settings'}
+      ];
+      document.getElementById('header-container').innerHTML = `
+        <div class="flex items-center gap-2">
+          <i data-lucide="utensils-crossed" class="w-6 h-6 text-[#FFC700]"></i>
+          <h1 class="text-xl font-black tracking-tighter system-name">BuonConto</h1>
+        </div>
+        <nav class="hidden md:flex gap-1 bg-[#0A3D2B] p-1 rounded-xl">
+          ${navs.map(n => `<button onclick="window.setTab('${n.id}')" class="px-3 py-1.5 rounded-lg flex items-center gap-2 border-2 transition-all ${state.activeTab === n.id ? 'bg-[#FFC700] text-black border-[#FFC700] font-bold' : 'text-white border-transparent hover:bg-[#146c4d]'}"><i data-lucide="${n.icon}" class="w-4 h-4"></i><span>${n.label}</span>${n.badge ? `<span class="bg-red-500 text-white text-[10px] px-1.5 rounded-full">${n.badge}</span>` : ''}</button>`).join('')}
         </nav>
+        <button onclick="window.logout()" class="p-2 bg-[#D32F2F] text-white rounded-lg"><i data-lucide="log-out" class="w-5 h-5"></i></button>
       `;
 
-      return `
-        <div class="flex items-center gap-2">
-          <i data-lucide="utensils-crossed" class="w-7 h-7 text-[#FFC700]"></i>
-          <h1 class="text-xl lg:text-2xl tracking-tighter system-name">BuonConto</h1>
-        </div>
-        <div class="flex items-center gap-2">
-          ${pcNav}
-          <button onclick="window.handleLogout()" class="p-2 bg-[#D32F2F] text-white rounded-lg hover:bg-red-700 transition-colors border-2 border-transparent focus:ring-4 focus:ring-[#FFC700]"><i data-lucide="log-out" class="w-5 h-5"></i></button>
-        </div>
-        <!-- モバイル用ボトムナビ（後でメインに追加） -->
-      `;
+      // Main Content
+      const main = document.getElementById('main-content');
+      if (state.activeTab === 'pos') main.innerHTML = getPosHTML();
+      else if (state.activeTab === 'kitchen') main.innerHTML = getKitchenHTML();
+      else if (state.activeTab === 'sales') main.innerHTML = getSalesHTML();
+      else if (state.activeTab === 'menu') main.innerHTML = getMenuHTML();
+      else if (state.activeTab === 'settings') main.innerHTML = getSettingsHTML();
+
+      // Modals & Print
+      document.getElementById('modal-container').innerHTML = getModalsHTML();
+      document.getElementById('print-view-container').innerHTML = getPrintViewHTML();
+      lucide.createIcons();
     }
 
     function getPosHTML() {
-      const order = state.tableOrders[state.selectedTable];
-      const subtotal = order.reduce((s, o) => s + (o.item.price + (o.extraCharge || 0)) * o.qty, 0);
-      const total = subtotal + Math.floor(subtotal * 0.1);
-
-      const menuGrid = state.selectedCategory === 'すべて' ? state.menu : state.menu.filter(i => i.category === state.selectedCategory);
+      const order = state.tableOrders[state.selectedTable] || [];
+      const sub = order.reduce((s, o) => s + (o.item.price + o.extra) * o.qty, 0);
+      const total = sub + Math.floor(sub * 0.1);
+      const filteredMenu = state.selectedCategory === 'すべて' ? state.menu : state.menu.filter(m => m.category === state.selectedCategory);
 
       return `
         <div class="flex flex-col lg:flex-row h-full overflow-hidden">
-          
-          <!-- 左：メニューエリア -->
-          <div class="flex-1 flex flex-col h-full bg-white border-r-2 border-[#CCCCCC] overflow-hidden">
-            <div class="p-3 bg-[#F4F7F5] border-b-2 border-[#CCCCCC] flex gap-2 overflow-x-auto shrink-0 no-scrollbar">
-              ${CATEGORIES.map(c => `<button onclick="window.setSelectedCategory('${c}')" class="px-4 py-2 rounded-full whitespace-nowrap border-2 font-bold text-sm transition-all ${state.selectedCategory === c ? 'bg-[#0F543C] text-white border-[#0F543C]' : 'bg-white border-[#777777]'}">${c}</button>`).join('')}
+          <div class="flex-1 flex flex-col h-full bg-white lg:bg-transparent overflow-hidden">
+            <div class="p-3 bg-white/50 border-b flex gap-2 overflow-x-auto no-scrollbar shrink-0">
+              ${CATEGORIES.map(c => `<button onclick="window.setSelectedCategory('${c}')" class="px-4 py-2 rounded-full border-2 font-bold text-sm whitespace-nowrap ${state.selectedCategory === c ? 'bg-[#0F543C] text-white border-[#0F543C]' : 'bg-white border-gray-300'}">${c}</button>`).join('')}
             </div>
-            <div class="flex-1 overflow-y-auto p-3 grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-3 content-start">
-              ${menuGrid.map(item => `<button onclick="window.openCustomizeModal(${item.id})" class="bg-white border-2 border-[#CCCCCC] rounded-2xl p-3 flex flex-col items-center justify-center text-center hover:border-[#0F543C] transition-all active:scale-95 min-h-[100px] shadow-sm focus:ring-4 focus:ring-[#0F543C]/20"><span class="text-[10px] font-bold text-[#777777]">${item.category}</span><span class="font-bold text-[#111111] leading-tight my-1">${item.name}</span><span class="text-[#0F543C] font-black">¥${item.price.toLocaleString()}</span></button>`).join('')}
+            <div class="flex-1 overflow-y-auto p-4 grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-3 content-start">
+              ${filteredMenu.map(m => `<button onclick="window.openCust(${m.id})" class="bg-white border-2 border-gray-200 rounded-2xl p-4 flex flex-col items-center justify-center text-center shadow-sm hover:border-[#0F543C]"><span class="text-[10px] text-gray-400 font-bold">${m.category}</span><span class="font-bold my-1 text-[#111111]">${m.name}</span><span class="text-[#0F543C] font-black">¥${m.price.toLocaleString()}</span></button>`).join('')}
             </div>
           </div>
-
-          <!-- 右（PC）/ スライド（スマホ）：カートエリア -->
-          <div id="cart-panel" class="fixed inset-y-0 right-0 w-full md:w-[400px] bg-[#F4F7F5] shadow-2xl z-[100] transform transition-transform duration-300 ${state.isMobileCartOpen ? 'translate-x-0' : 'translate-x-full'} lg:relative lg:translate-x-0 lg:z-0 lg:shadow-none lg:flex lg:flex-col border-l-2 border-[#CCCCCC]">
-            <div class="p-4 bg-white border-b-2 border-[#CCCCCC] flex justify-between items-center shrink-0">
-              <span class="font-black text-lg">卓: ${state.selectedTable}</span>
+          <!-- Cart -->
+          <div id="cart-panel" class="fixed inset-y-0 right-0 w-full md:w-[380px] bg-white lg:bg-[#F4F7F5] shadow-2xl lg:shadow-none z-[100] transform transition-transform duration-300 ${state.isMobileCartOpen ? 'translate-x-0' : 'translate-x-full lg:translate-x-0'} flex flex-col border-l-2 border-gray-200">
+            <div class="p-4 bg-white border-b flex justify-between items-center shrink-0">
+              <span class="font-black text-xl text-[#0F543C]">卓: ${state.selectedTable}</span>
               <div class="flex gap-1">
-                ${TABLES.map(t => `<button onclick="window.setSelectedTable(${t})" class="w-9 h-9 rounded-full font-bold text-sm border-2 transition-all ${state.selectedTable === t ? 'bg-[#0F543C] text-white border-[#0F543C]' : 'bg-white text-gray-500 border-[#CCCCCC]'}">${t}</button>`).join('')}
+                ${TABLES.map(t => `<button onclick="window.setTable(${t})" class="w-9 h-9 rounded-full font-bold border-2 ${state.selectedTable === t ? 'bg-[#0F543C] text-white border-[#0F543C]' : 'bg-white text-gray-400'}">${t}</button>`).join('')}
               </div>
-              <button onclick="window.setIsMobileCartOpen(false)" class="lg:hidden p-2"><i data-lucide="x" class="w-7 h-7"></i></button>
+              <button onclick="window.toggleCart(false)" class="lg:hidden p-2"><i data-lucide="x"></i></button>
             </div>
-            
             <div class="flex-1 overflow-y-auto p-4 space-y-3">
-              ${order.length === 0 ? `<div class="h-full flex flex-col items-center justify-center opacity-30 font-bold"><i data-lucide="shopping-cart" class="w-16 h-16 mb-2"></i>空っぽです</div>` : 
-                order.map((o, i) => `
-                <div class="bg-white p-3 rounded-xl border-2 ${o.sentToKitchen ? 'border-[#DDDDDD] opacity-70' : 'border-[#0F543C] shadow-sm'}">
-                  <div class="flex justify-between font-bold mb-1">
-                    <span>${o.item.name}${o.sentToKitchen ? '<span class="ml-2 text-[10px] bg-gray-200 px-1 rounded">済</span>' : ''}</span>
-                    <span>¥${((o.item.price + o.extraCharge) * o.qty).toLocaleString()}</span>
-                  </div>
-                  ${o.note ? `<div class="text-[10px] text-red-600 font-bold mb-1">● ${o.note}</div>` : ''}
+              ${order.map((o, i) => `
+                <div class="bg-white p-3 rounded-xl border-2 ${o.sent ? 'border-gray-200 opacity-60' : 'border-[#0F543C] shadow-sm'}">
+                  <div class="flex justify-between font-bold text-sm"><span>${o.item.name}</span><span>¥${((o.item.price + o.extra) * o.qty).toLocaleString()}</span></div>
+                  ${o.note ? `<div class="text-[10px] text-red-500 font-bold mt-1">● ${o.note}</div>` : ''}
                   <div class="flex justify-between items-center mt-2">
-                    <span class="text-xs text-gray-400">@¥${(o.item.price + o.extraCharge).toLocaleString()}</span>
-                    <div class="flex items-center gap-3 bg-gray-100 p-1 rounded-lg">
-                      <button onclick="window.updateQty(${i}, -1)" class="w-8 h-8 bg-white rounded border border-[#CCCCCC] flex items-center justify-center"><i data-lucide="${o.qty === 1 ? 'trash-2' : 'minus'}" class="w-4 h-4 ${o.qty === 1 ? 'text-red-500' : ''}"></i></button>
-                      <span class="font-black w-4 text-center">${o.qty}</span>
-                      <button onclick="window.updateQty(${i}, 1)" class="w-8 h-8 bg-white rounded border border-[#CCCCCC] flex items-center justify-center"><i data-lucide="plus" class="w-4 h-4"></i></button>
+                    <span class="text-[10px] text-gray-400">@¥${(o.item.price + o.extra).toLocaleString()}</span>
+                    <div class="flex items-center gap-3 bg-gray-50 p-1 rounded-lg">
+                      <button onclick="window.upQty(${i},-1)" class="w-7 h-7 bg-white rounded border flex items-center justify-center"><i data-lucide="${o.qty === 1 ? 'trash-2' : 'minus'}" class="w-3 h-3"></i></button>
+                      <span class="font-bold text-sm w-4 text-center">${o.qty}</span>
+                      <button onclick="window.upQty(${i},1)" class="w-7 h-7 bg-white rounded border flex items-center justify-center"><i data-lucide="plus" class="w-3 h-3"></i></button>
                     </div>
                   </div>
                 </div>
               `).join('')}
             </div>
-
-            <div class="p-4 bg-white border-t-2 border-[#CCCCCC] space-y-3 shrink-0">
-              <div class="flex justify-between font-black text-xl border-b-2 border-dashed pb-2"><span>合計(税込)</span><span>¥${total.toLocaleString()}</span></div>
-              <button onclick="window.sendKitchen()" ${order.some(o => !o.sentToKitchen) ? '' : 'disabled'} class="w-full py-3 bg-[#FFC700] text-[#111111] font-black rounded-xl border-2 border-transparent disabled:opacity-30 flex items-center justify-center gap-2"><i data-lucide="printer"></i>厨房へ伝票送信</button>
-              <button onclick="window.checkout()" ${order.length > 0 ? '' : 'disabled'} class="w-full py-4 bg-[#0F543C] text-white font-black text-xl rounded-xl border-2 border-transparent disabled:opacity-30 flex items-center justify-center gap-2"><i data-lucide="calculator"></i>お会計</button>
+            <div class="p-4 bg-white border-t space-y-3 shrink-0">
+              <div class="flex justify-between font-black text-2xl border-b border-dashed pb-2"><span>合計</span><span>¥${total.toLocaleString()}</span></div>
+              <button onclick="window.sendToK()" ${order.some(o=>!o.sent) ? '' : 'disabled'} class="w-full py-3 bg-[#FFC700] text-black font-black rounded-xl disabled:opacity-30">厨房へ送信</button>
+              <button onclick="window.pay()" ${order.length > 0 ? '' : 'disabled'} class="w-full py-4 bg-[#0F543C] text-white font-black text-xl rounded-xl shadow-lg disabled:opacity-30">お会計 (レシート印字)</button>
             </div>
           </div>
-
-          <!-- スマホ用：カートを見るボタン -->
-          <button onclick="window.setIsMobileCartOpen(true)" class="lg:hidden fixed bottom-20 right-6 w-16 h-16 bg-[#0F543C] text-white rounded-full shadow-2xl flex flex-col items-center justify-center z-50 border-4 border-white">
-            <i data-lucide="shopping-cart" class="w-6 h-6"></i>
-            <span class="text-[10px] font-black">${order.reduce((s,o)=>s+o.qty,0)}点</span>
-          </button>
-
-          <!-- モバイル用下部タブナビ -->
-          <div class="lg:hidden fixed bottom-0 inset-x-0 bg-white border-t-2 border-[#CCCCCC] flex justify-around p-2 z-[60]">
-             ${['pos', 'kitchen', 'sales', 'menu', 'settings'].map(tab => {
-               const labels = {pos:'注文', kitchen:'厨房', sales:'売上', menu:'メニュー', settings:'設定'};
-               const icons = {pos:'calculator', kitchen:'chef-hat', sales:'book-open', menu:'clipboard-list', settings:'settings'};
-               return `<button onclick="window.setActiveTab('${tab}')" class="flex flex-col items-center gap-1 ${state.activeTab === tab ? 'text-[#0F543C]' : 'text-gray-400'}"><i data-lucide="${icons[tab]}" class="w-6 h-6"></i><span class="text-[10px] font-bold">${labels[tab]}</span></button>`;
-             }).join('')}
+          <!-- Mobile Toggle & Nav -->
+          <button onclick="window.toggleCart(true)" class="lg:hidden fixed bottom-20 right-6 w-14 h-14 bg-[#0F543C] text-white rounded-full shadow-xl flex items-center justify-center z-50 border-4 border-white"><i data-lucide="shopping-cart"></i></button>
+          <div class="lg:hidden fixed bottom-0 inset-x-0 bg-white border-t flex justify-around p-2 z-[60]">
+             ${['pos', 'kitchen', 'sales', 'menu', 'settings'].map(t => `<button onclick="window.setTab('${t}')" class="flex flex-col items-center gap-1 ${state.activeTab === t ? 'text-[#0F543C]' : 'text-gray-400'}"><i data-lucide="${navs.find(n=>n.id===t).icon}" class="w-5 h-5"></i><span class="text-[9px] font-bold">${navs.find(n=>n.id===t).label}</span></button>`).join('')}
           </div>
         </div>
       `;
     }
 
-    // --- その他画面 ---
     function getKitchenHTML() {
       return `
-        <div class="p-4 h-full overflow-y-auto pb-24 lg:pb-8">
-          <h2 class="text-2xl font-black text-[#0F543C] mb-4 border-b-4 border-[#FFC700] pb-1 inline-block">厨房の注文状況</h2>
+        <div class="p-4 lg:p-8 h-full overflow-y-auto pb-24">
+          <h2 class="text-2xl font-black text-[#0F543C] mb-6 border-b-4 border-[#FFC700] pb-1 inline-block">厨房注文</h2>
           <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-            ${state.kitchenTickets.length === 0 ? '<p class="font-bold opacity-30 text-xl py-10">調理待ちはありません</p>' : 
-              state.kitchenTickets.map(t => `
-              <div class="bg-white rounded-2xl border-2 border-[#CCCCCC] overflow-hidden flex flex-col shadow-sm ${t.status !== 'pending' ? 'opacity-50' : 'border-l-8 border-l-[#FFC700]'}">
-                <div class="p-3 bg-[#F8F9FA] border-b flex justify-between items-center font-black">
-                  <span class="text-xl">テーブル ${t.table}</span>
-                  <span class="text-sm">${formatTime(t.time)}</span>
+            ${state.kitchenTickets.map(t => `
+              <div class="bg-white rounded-2xl border-2 ${t.status === 'pending' ? 'border-orange-400 border-l-[12px]' : 'border-gray-200 opacity-50'} overflow-hidden flex flex-col">
+                <div class="p-3 bg-gray-50 border-b flex justify-between items-center">
+                  <span class="font-black text-xl">テーブル ${t.table}</span>
+                  <span class="text-xs font-bold text-gray-400">${formatTime(t.time)}</span>
                 </div>
                 <div class="p-4 flex-1 space-y-3">
                   ${t.items.map(i => `
                     <div class="border-b border-dashed pb-2 last:border-0">
-                      <div class="flex justify-between font-bold text-lg"><span>${i.item.name}</span><span class="bg-[#E8F0EC] px-2 rounded">x${i.qty}</span></div>
-                      ${i.note ? `<div class="text-xs text-red-600 font-bold bg-red-50 p-1 rounded mt-1">【${i.note}】</div>` : ''}
+                      <div class="flex justify-between font-bold text-lg"><span>${i.item.name}</span><span class="bg-gray-100 px-2 rounded">x${i.qty}</span></div>
+                      ${i.note ? `<div class="text-xs text-red-600 font-bold mt-1">【${i.note}】</div>` : ''}
                     </div>
                   `).join('')}
                 </div>
-                <div class="p-3 bg-[#F8F9FA] border-t">
-                  ${t.status === 'pending' ? `<button onclick="window.markTicketCompleted(${t.id})" class="w-full py-3 bg-[#0F543C] text-white font-bold rounded-xl flex items-center justify-center gap-2"><i data-lucide="check-circle"></i>調理完了</button>` : 
-                  `<div class="text-center font-bold text-gray-400 py-2">完了済み</div>`}
-                </div>
+                ${t.status === 'pending' ? `<button onclick="window.doneK(${t.id})" class="m-3 py-3 bg-[#0F543C] text-white font-bold rounded-xl">調理完了</button>` : `<div class="p-4 text-center font-bold text-gray-400">完了済み</div>`}
               </div>
             `).join('')}
           </div>
@@ -422,103 +417,211 @@
       `;
     }
 
-    // 共通の描画
-    function render() {
-      const initial = document.getElementById('initial-loading');
-      if (initial) initial.classList.add('hidden');
-
-      if (!currentUser) {
-        document.getElementById('app-container').classList.add('hidden');
-        document.getElementById('login-container').classList.remove('hidden');
-        document.getElementById('login-container').innerHTML = getLoginHTML();
-        lucide.createIcons(); return;
-      }
-
-      // 権限チェック
-      const isAdmin = currentUser.email === state.adminEmail;
-      const isAllowed = isAdmin || state.allowedEmails.includes(currentUser.email);
-
-      if (!isAllowed) {
-        if (!state.pendingEmails.includes(currentUser.email) && !pendingRequestSent) {
-          state.pendingEmails.push(currentUser.email);
-          saveToFirebase(); pendingRequestSent = true;
-        }
-        document.getElementById('app-container').classList.add('hidden');
-        document.getElementById('pending-container').classList.remove('hidden');
-        document.getElementById('pending-container').innerHTML = getPendingHTML();
-        lucide.createIcons(); return;
-      }
-
-      document.getElementById('login-container').classList.add('hidden');
-      document.getElementById('pending-container').classList.add('hidden');
-      document.getElementById('app-container').classList.remove('hidden');
-
-      document.getElementById('header-container').innerHTML = getHeaderHTML();
-      
-      const main = document.getElementById('main-content');
-      if (state.activeTab === 'pos') main.innerHTML = getPosHTML();
-      else if (state.activeTab === 'kitchen') main.innerHTML = getKitchenHTML();
-      else main.innerHTML = `<div class="p-10 text-center font-bold opacity-30 text-2xl">Coming Soon (履歴/設定画面)</div>`;
-
-      // モーダルと印刷ビューの更新（前バージョンから継承）
-      document.getElementById('modal-container').innerHTML = getModalsHTML();
-      document.getElementById('print-view-container').innerHTML = getPrintViewHTML();
-      
-      lucide.createIcons();
-    }
-
-    // --- その他の関数 (省略せず配置) ---
-    function getLoginHTML() {
+    function getSalesHTML() {
+      const total = state.salesRecord.reduce((s, r) => s + r.total, 0);
       return `
-        <div class="bg-white p-8 lg:p-12 rounded-3xl shadow-2xl max-w-md w-full text-center border-4 border-[#0F543C]">
-          <i data-lucide="utensils-crossed" class="w-16 h-16 text-[#0F543C] mx-auto mb-4"></i>
-          <h1 class="text-4xl font-black text-[#0F543C] mb-2 system-name">BuonConto</h1>
-          <p class="text-gray-500 font-bold mb-8">店舗管理システム</p>
-          <button onclick="window.handleGoogleLogin()" class="w-full py-4 bg-white hover:bg-gray-50 border-2 border-[#CCCCCC] rounded-2xl flex items-center justify-center gap-3 font-black text-lg shadow-sm transition-all active:scale-95">
-            <svg class="w-6 h-6" viewBox="0 0 24 24"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/></svg>
-            Googleでログイン
-          </button>
-          <p class="mt-6 text-[10px] text-gray-400 font-bold">※ 承認済みの関係者のみ利用可能です</p>
-        </div>
-      `;
-    }
-
-    function getPendingHTML() {
-      return `<div class="bg-white p-10 rounded-3xl text-center max-w-sm"><i data-lucide="clock" class="w-16 h-16 text-[#0F543C] mx-auto mb-4"></i><h2 class="text-2xl font-black mb-4">承認待ち</h2><p class="font-bold text-gray-500 mb-8 leading-relaxed">管理者に申請を送りました。承認されるまでしばらくお待ちください。<br><span class="text-xs">(${currentUser.email})</span></p><button onclick="window.handleLogout()" class="w-full py-3 bg-gray-100 rounded-xl font-bold">ログアウト</button></div>`;
-    }
-
-    function getModalsHTML() {
-      if (!state.customizingItem) return '';
-      const { item } = state.customizingItem;
-      return `
-        <div class="fixed inset-0 z-[300] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-          <div class="bg-white rounded-3xl shadow-2xl max-w-md w-full overflow-hidden border-4 border-[#0F543C]">
-            <div class="p-6 bg-[#F4F7F5] border-b-2 border-[#CCCCCC]">
-              <span class="text-xs font-black text-gray-400">${item.category}</span>
-              <h2 class="text-2xl font-black text-[#111111]">${item.name}</h2>
-              <div class="text-[#0F543C] font-black text-xl mt-1">¥${item.price.toLocaleString()}</div>
-            </div>
-            <div class="p-6 space-y-6">
-              <div>
-                <label class="block font-black mb-2">備考 (抜き/辛め等)</label>
-                <input type="text" id="cust-note" class="w-full p-4 border-2 border-[#CCCCCC] rounded-2xl font-bold text-lg focus:border-[#0F543C] outline-none" placeholder="例: 玉ねぎ抜き">
-              </div>
-              <div>
-                <label class="block font-black mb-2">追加料金 (大盛等)</label>
-                <input type="number" id="cust-extra" value="0" class="w-full p-4 border-2 border-[#CCCCCC] rounded-2xl font-bold text-lg focus:border-[#0F543C] outline-none">
-              </div>
-            </div>
-            <div class="p-4 bg-gray-50 border-t flex gap-3">
-              <button onclick="window.closeCustomizeModal()" class="flex-1 py-4 bg-white border-2 border-[#CCCCCC] rounded-2xl font-black">戻る</button>
-              <button onclick="window.confirmOrder()" class="flex-2 py-4 bg-[#0F543C] text-white rounded-2xl font-black px-8 shadow-lg">追加する</button>
+        <div class="p-4 lg:p-8 h-full overflow-y-auto pb-24 max-w-4xl mx-auto w-full">
+          <div class="bg-white rounded-3xl p-6 shadow-sm border-2 border-gray-200 mb-6 flex justify-between items-center">
+            <div><p class="text-xs font-bold text-gray-400 mb-1">本日の売上</p><p class="text-4xl font-black text-[#0F543C]">¥${total.toLocaleString()}</p></div>
+            <div class="text-right"><p class="text-xs font-bold text-gray-400 mb-1">客数</p><p class="text-2xl font-black">${state.salesRecord.length}組</p></div>
+          </div>
+          <div class="bg-white rounded-3xl border-2 border-gray-200 overflow-hidden">
+            <div class="p-4 bg-gray-50 border-b font-black">会計履歴</div>
+            <div class="divide-y">
+              ${state.salesRecord.map(r => `
+                <div class="p-4 flex justify-between items-start hover:bg-gray-50">
+                  <div>
+                    <p class="font-bold text-sm">${formatTime(r.time)} / 卓 ${r.table}</p>
+                    <p class="text-xs text-gray-500 mt-1">${r.items.map(i => i.item.name + 'x' + i.qty).join(', ')}</p>
+                  </div>
+                  <p class="font-black text-[#0F543C]">¥${r.total.toLocaleString()}</p>
+                </div>
+              `).join('')}
             </div>
           </div>
         </div>
       `;
     }
 
-    // 印刷・レシート表示（前コードと同様のため簡略化）
-    function getPrintViewHTML() { return ''; }
+    function getMenuHTML() {
+      return `
+        <div class="p-4 lg:p-8 h-full overflow-y-auto pb-24 max-w-4xl mx-auto w-full">
+          <div class="flex justify-between items-center mb-6">
+            <h2 class="text-2xl font-black text-[#0F543C]">商品管理</h2>
+            <button onclick="state.editingMenu={}; render();" class="bg-[#0F543C] text-white px-4 py-2 rounded-xl font-bold flex items-center gap-2"><i data-lucide="plus"></i>追加</button>
+          </div>
+          <div class="bg-white rounded-3xl border-2 border-gray-200 overflow-hidden">
+            <table class="w-full text-left">
+              <thead class="bg-gray-50 text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                <tr><th class="p-4">商品名</th><th class="p-4">カテゴリ</th><th class="p-4">価格</th><th class="p-4">操作</th></tr>
+              </thead>
+              <tbody class="divide-y">
+                ${state.menu.map(m => `
+                  <tr>
+                    <td class="p-4 font-bold">${m.name}</td>
+                    <td class="p-4 text-xs font-bold text-gray-500">${m.category}</td>
+                    <td class="p-4 font-black">¥${m.price.toLocaleString()}</td>
+                    <td class="p-4">
+                      <div class="flex gap-2">
+                        <button onclick="state.editingMenu={...state.menu.find(x=>x.id===${m.id})}; render();" class="p-2 bg-gray-100 rounded-lg"><i data-lucide="pencil" class="w-4 h-4"></i></button>
+                        <button onclick="window.delMenu(${m.id})" class="p-2 bg-red-50 text-red-500 rounded-lg"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+                      </div>
+                    </td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      `;
+    }
+
+    function getSettingsHTML() {
+      const email = currentUser?.email;
+      const isAdmin = email === state.adminEmail;
+
+      return `
+        <div class="p-4 lg:p-8 h-full overflow-y-auto pb-24 max-w-4xl mx-auto w-full space-y-6">
+          <div class="bg-white rounded-3xl p-6 border-2 border-gray-200">
+            <h3 class="font-black text-lg mb-4 flex items-center gap-2"><i data-lucide="store" class="text-[#0F543C]"></i>店舗情報</h3>
+            <div class="space-y-4">
+              <div><label class="text-[10px] font-bold text-gray-400 block mb-1">店名</label><input type="text" id="s-name" value="${state.storeInfo.name}" class="w-full p-3 border-2 border-gray-200 rounded-xl font-bold"></div>
+              <div><label class="text-[10px] font-bold text-gray-400 block mb-1">住所</label><input type="text" id="s-addr" value="${state.storeInfo.address}" class="w-full p-3 border-2 border-gray-200 rounded-xl font-bold"></div>
+              <button onclick="state.storeInfo.name=document.getElementById('s-name').value; state.storeInfo.address=document.getElementById('s-addr').value; save(); render();" class="w-full py-3 bg-[#0F543C] text-white font-bold rounded-xl">更新する</button>
+            </div>
+          </div>
+          
+          ${isAdmin ? `
+            <div class="bg-white rounded-3xl p-6 border-4 border-[#0F543C]">
+              <h3 class="font-black text-lg mb-4 flex items-center gap-2 text-[#0F543C]"><i data-lucide="shield-check"></i>アクセス権限管理</h3>
+              <div class="space-y-6">
+                <div>
+                  <p class="text-xs font-bold text-gray-400 mb-2">承認待ちの申請</p>
+                  ${state.pendingEmails.length === 0 ? '<p class="text-xs text-gray-300 font-bold">現在はありません</p>' : 
+                    state.pendingEmails.map(e => `
+                    <div class="flex justify-between items-center p-3 bg-orange-50 rounded-xl border border-orange-200 mb-2">
+                      <span class="text-sm font-bold">${e}</span>
+                      <button onclick="window.approve('${e}')" class="bg-[#0F543C] text-white px-3 py-1.5 rounded-lg text-xs font-bold">承認する</button>
+                    </div>
+                  `).join('')}
+                </div>
+                <div>
+                  <p class="text-xs font-bold text-gray-400 mb-2">利用許可済み</p>
+                  ${state.allowedEmails.map(e => `
+                    <div class="flex justify-between items-center p-3 bg-gray-50 rounded-xl mb-2">
+                      <span class="text-sm font-bold">${e}</span>
+                      <button onclick="window.revoke('${e}')" class="text-red-500 font-bold text-xs">取消</button>
+                    </div>
+                  `).join('')}
+                </div>
+              </div>
+            </div>
+          ` : `<div class="bg-white rounded-3xl p-6 border-2 border-gray-200 text-center opacity-50"><p class="font-bold text-gray-400">管理権限がないため、権限設定は行えません</p></div>`}
+        </div>
+      `;
+    }
+
+    function getModalsHTML() {
+      let html = '';
+      if (state.customizingItem) {
+        const { item } = state.customizingItem;
+        html += `
+          <div class="fixed inset-0 z-[300] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+            <div class="bg-white rounded-3xl shadow-2xl max-w-md w-full overflow-hidden border-4 border-[#0F543C]">
+              <div class="p-6 bg-[#F4F7F5] border-b-2">
+                <span class="text-xs font-black text-gray-400">${item.category}</span>
+                <h2 class="text-2xl font-black">${item.name}</h2>
+              </div>
+              <div class="p-6 space-y-6">
+                <div><label class="block font-black mb-2 text-sm">備考 (抜き/辛め等)</label><input type="text" id="c-note" class="w-full p-4 border-2 border-gray-200 rounded-2xl font-bold text-lg outline-none focus:border-[#0F543C]" placeholder="例: 玉ねぎ抜き"></div>
+                <div><label class="block font-black mb-2 text-sm">追加料金 (大盛等)</label><input type="number" id="c-extra" value="0" class="w-full p-4 border-2 border-gray-200 rounded-2xl font-bold text-lg outline-none focus:border-[#0F543C]"></div>
+              </div>
+              <div class="p-4 bg-gray-50 border-t flex gap-3">
+                <button onclick="window.closeCust()" class="flex-1 py-4 bg-white border-2 border-gray-300 rounded-2xl font-black">戻る</button>
+                <button onclick="window.addOrder()" class="flex-[2] py-4 bg-[#0F543C] text-white rounded-2xl font-black shadow-lg">追加する</button>
+              </div>
+            </div>
+          </div>
+        `;
+      }
+      if (state.editingMenu) {
+        const m = state.editingMenu;
+        html += `
+          <div class="fixed inset-0 z-[300] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+            <form onsubmit="window.saveMenu(event)" class="bg-white rounded-3xl shadow-2xl max-w-md w-full overflow-hidden border-4 border-[#0F543C]">
+              <div class="p-6 bg-[#F4F7F5] border-b-2 font-black text-xl">${m.id ? '商品編集' : '新規追加'}</div>
+              <div class="p-6 space-y-4">
+                <div><label class="block font-black mb-1 text-xs">商品名</label><input type="text" id="m-name" value="${m.name||''}" required class="w-full p-3 border-2 border-gray-200 rounded-xl font-bold"></div>
+                <div><label class="block font-black mb-1 text-xs">価格</label><input type="number" id="m-price" value="${m.price||1000}" required class="w-full p-3 border-2 border-gray-200 rounded-xl font-bold"></div>
+                <div><label class="block font-black mb-1 text-xs">カテゴリ</label><select id="m-cat" class="w-full p-3 border-2 border-gray-200 rounded-xl font-bold">${CATEGORIES.filter(c=>c!=='すべて').map(c=>`<option value="${c}" ${m.category===c?'selected':''}>${c}</option>`).join('')}</select></div>
+              </div>
+              <div class="p-4 bg-gray-50 border-t flex gap-3">
+                <button type="button" onclick="state.editingMenu=null; render();" class="flex-1 py-3 bg-white border-2 border-gray-300 rounded-xl font-bold">中止</button>
+                <button type="submit" class="flex-1 py-3 bg-[#0F543C] text-white font-bold rounded-xl shadow-lg">保存</button>
+              </div>
+            </form>
+          </div>
+        `;
+      }
+      if (state.printContent) {
+        const { type, data } = state.printContent;
+        html += `
+          <div class="fixed inset-0 z-[400] flex items-center justify-center p-4 bg-black/80">
+            <div class="bg-white rounded-3xl shadow-2xl max-w-sm w-full overflow-hidden flex flex-col max-h-[90vh]">
+              <div class="p-4 bg-[#E8F0EC] border-b flex justify-between items-center"><h3 class="font-black text-[#0F543C]">${type==='kitchen'?'厨房伝票':'レシート'}</h3><button onclick="window.closePrintModal()"><i data-lucide="x"></i></button></div>
+              <div class="p-6 overflow-y-auto bg-gray-100 flex-1">
+                <div class="bg-white p-6 shadow mx-auto w-[280px] font-mono text-[11px] leading-tight">
+                  ${type==='kitchen' ? `
+                    <div class="text-center font-black text-lg border-b-2 border-black pb-2 mb-2">厨房伝票</div>
+                    <div class="flex justify-between font-bold mb-2"><span>卓: ${data.table}</span><span>${formatTime(data.time)}</span></div>
+                    ${data.items.map(o => `<div class="border-b border-black py-1"><div class="flex justify-between font-black text-sm"><span>${o.item.name}</span><span>x ${o.qty}</span></div>${o.note?`<div class="mt-0.5">※ ${o.note}</div>`:''}</div>`).join('')}
+                  ` : `
+                    <div class="text-center mb-4"><h2 class="text-lg font-black">${state.storeInfo.name}</h2><p>${state.storeInfo.address}</p></div>
+                    <div class="flex justify-between mb-2"><span>卓: ${data.table}</span><span>${formatTime(data.time)}</span></div>
+                    <div class="border-y border-dashed border-black py-2 mb-2">
+                      ${data.items.map(o => `<div class="flex justify-between mb-1"><span>${o.item.name} x${o.qty}</span><span>¥${((o.item.price+o.extra)*o.qty).toLocaleString()}</span></div>`).join('')}
+                    </div>
+                    <div class="flex justify-between"><span>小計</span><span>¥${data.subtotal.toLocaleString()}</span></div>
+                    <div class="flex justify-between"><span>消費税</span><span>¥${data.tax.toLocaleString()}</span></div>
+                    <div class="flex justify-between font-black text-lg mt-1 pt-1 border-t border-black"><span>合計</span><span>¥${data.total.toLocaleString()}</span></div>
+                    <p class="text-center mt-4">${state.storeInfo.message}</p>
+                  `}
+                </div>
+              </div>
+              <div class="p-4 bg-white border-t flex gap-2">
+                <button onclick="window.closePrintModal()" class="flex-1 py-3 border-2 border-gray-300 rounded-xl font-bold">閉じる</button>
+                <button onclick="window.print(); window.closePrintModal();" class="flex-1 py-3 bg-[#0F543C] text-white font-bold rounded-xl shadow-lg flex items-center justify-center gap-2"><i data-lucide="printer" class="w-4 h-4"></i>印刷</button>
+              </div>
+            </div>
+          </div>
+        `;
+      }
+      return html;
+    }
+
+    function getPrintViewHTML() {
+      if (!state.printContent) return '';
+      const { type, data } = state.printContent;
+      return `<div class="max-w-[300px] mx-auto font-mono text-[12px] leading-tight">
+        ${type === 'kitchen' ? `
+          <h2 class="text-center text-xl font-black border-b-2 border-black pb-2 mb-4">厨房伝票</h2>
+          <div class="flex justify-between font-bold mb-4 text-lg"><span>テーブル: ${data.table}</span><span>${formatTime(data.time)}</span></div>
+          ${data.items.map(o => `<div class="border-b border-black py-2"><div class="flex justify-between font-black text-xl"><span>${o.item.name}</span><span>x ${o.qty}</span></div>${o.note ? `<div class="mt-1 font-bold">※ ${o.note}</div>` : ''}</div>`).join('')}
+        ` : `
+          <div class="text-center mb-6"><h2 class="text-2xl font-black mb-1">${state.storeInfo.name}</h2><p class="text-xs">${state.storeInfo.address}</p></div>
+          <div class="flex justify-between mb-4"><span>卓: ${data.table}</span><span>${formatTime(data.time)}</span></div>
+          <div class="border-y border-dashed border-black py-4 mb-4">
+            ${data.items.map(o => `<div class="flex justify-between mb-1"><span>${o.item.name} x${o.qty}</span><span>¥${((o.item.price+o.extra)*o.qty).toLocaleString()}</span></div>`).join('')}
+          </div>
+          <div class="flex justify-between mb-1"><span>小計</span><span>¥${data.subtotal.toLocaleString()}</span></div>
+          <div class="flex justify-between mb-1"><span>消費税(10%)</span><span>¥${data.tax.toLocaleString()}</span></div>
+          <div class="flex justify-between font-black text-xl mt-2 pt-2 border-t-2 border-black"><span>合計</span><span>¥${data.total.toLocaleString()}</span></div>
+          <p class="text-center mt-8 whitespace-pre-line">${state.storeInfo.message}</p>
+        `}
+      </div>`;
+    }
+
+    function formatTime(date) { return date.toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' }); }
 
   </script>
 </body>
