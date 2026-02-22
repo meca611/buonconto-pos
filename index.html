@@ -93,14 +93,14 @@
     // ==========================================
     // ▼ ここをご自身のFirebase設定に書き換えてください ▼
     // ==========================================
-const firebaseConfig = {
-  apiKey: "AIzaSyDBBDoF8VjeAxEDdSUMxsM4c8eAWrdZFTQ",
-  authDomain: "buon-poss.firebaseapp.com",
-  projectId: "buon-poss",
-  storageBucket: "buon-poss.firebasestorage.app",
-  messagingSenderId: "75771144487",
-  appId: "1:75771144487:web:aa2e0921263edab72d6102"
-};
+    const DEFAULT_FIREBASE_CONFIG = {
+      apiKey: "AIzaSyDBBDoF8VjeAxEDdSUMxsM4c8eAWrdZFTQ",
+      authDomain: "buon-poss.firebaseapp.com",
+      projectId: "buon-poss",
+      storageBucket: "buon-poss.firebasestorage.app",
+      messagingSenderId: "75771144487",
+      appId: "1:75771144487:web:aa2e0921263edab72d6102"
+    };
     // ==========================================
 
     const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : DEFAULT_FIREBASE_CONFIG;
