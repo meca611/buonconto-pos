@@ -37,8 +37,21 @@
 </head>
 <body class="min-h-screen bg-[#F4F7F5] font-sans print:bg-white text-[#111111]">
 
+  <!-- 初期ロード画面（モジュールエラーや読み込み中の場合に表示） -->
+  <div id="initial-loading" class="h-screen w-full flex flex-col items-center justify-center bg-[#F4F7F5] p-6 text-center">
+    <div class="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-[#0F543C] mb-6"></div>
+    <p class="font-bold text-[#0F543C] text-2xl mb-2">システムを準備しています...</p>
+    <div class="bg-white p-4 rounded-xl border border-[#CCCCCC] max-w-md text-sm text-[#444444] font-bold leading-relaxed mt-4 shadow-sm text-left">
+      <p class="mb-2 text-[#D32F2F]"><i data-lucide="info" class="w-4 h-4 inline-block -mt-1 mr-1"></i> もしこの画面から進まない場合</p>
+      <ul class="list-disc pl-5 space-y-1">
+        <li>パソコンに保存したファイルを直接ダブルクリック（<code>file://</code>）して開いていませんか？GitHub PagesなどのURL（<code>https://〜</code>）からアクセスしてください。</li>
+        <li>ソースコード内のFirebase設定（APIキーなど）が正しく書き換えられているか確認してください。</li>
+      </ul>
+    </div>
+  </div>
+
   <!-- ログイン画面コンテナ -->
-  <div id="login-container" class="hidden h-screen w-full flex items-center justify-center bg-[#0F543C] p-4"></div>
+  <div id="login-container" class="hidden h-screen w-full flex flex-col items-center justify-center bg-[#0F543C] p-4"></div>
 
   <!-- 承認待ち画面コンテナ -->
   <div id="pending-container" class="hidden h-screen w-full flex items-center justify-center bg-[#0F543C] p-4"></div>
@@ -74,9 +87,11 @@
     import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
     import { getFirestore, doc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
+    // アイコンの初期化（ローディング画面用）
+    lucide.createIcons();
+
     // ==========================================
     // ▼ ここをご自身のFirebase設定に書き換えてください ▼
-    // （※メールアドレス等をここに書く必要はありません。公開されても安全な接続情報です）
     // ==========================================
 const firebaseConfig = {
   apiKey: "AIzaSyDBBDoF8VjeAxEDdSUMxsM4c8eAWrdZFTQ",
@@ -91,6 +106,26 @@ const firebaseConfig = {
     const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : DEFAULT_FIREBASE_CONFIG;
     const appId = typeof __app_id !== 'undefined' ? __app_id : 'buonconto-pos';
     
+    // ▼ 設定未完了（初期状態）を検知してエラー画面を出す処理 ▼
+    if (firebaseConfig.apiKey === "YOUR_API_KEY") {
+      document.getElementById('initial-loading').classList.add('hidden');
+      document.getElementById('login-container').classList.remove('hidden');
+      document.getElementById('login-container').innerHTML = `
+        <div class="bg-white p-10 rounded-2xl shadow-2xl max-w-md w-full text-center border-4 border-[#D32F2F]">
+          <div class="mb-6 flex justify-center">
+             <i data-lucide="alert-triangle" class="w-16 h-16 text-[#D32F2F]" aria-hidden="true"></i>
+          </div>
+          <h1 class="text-3xl font-black text-[#D32F2F] mb-4">設定が必要です</h1>
+          <p class="text-[#444444] font-bold mb-6 leading-relaxed text-left">
+            ソースコード内の <code>DEFAULT_FIREBASE_CONFIG</code> の部分が書き換えられていません。<br><br>
+            Firebaseプロジェクトを作成し、ご自身のAPIキーなどの情報に書き換えてから再度アクセスしてください。
+          </p>
+        </div>
+      `;
+      lucide.createIcons();
+      throw new Error("Firebase Configuration is missing."); // ここで実行を停止
+    }
+
     const app = initializeApp(firebaseConfig);
     const auth = getAuth(app);
     const db = getFirestore(app);
@@ -126,9 +161,9 @@ const firebaseConfig = {
 
     // --- ステート管理 ---
     const state = {
-      adminEmail: null,      // 追加: 管理者（最初にログインした人）
-      allowedEmails: [],     // 追加: 承認されたユーザーのリスト
-      pendingEmails: [],     // 追加: 承認待ちのユーザーのリスト
+      adminEmail: null,
+      allowedEmails: [],
+      pendingEmails: [],
       activeTab: 'pos',
       menu: INITIAL_MENU,
       selectedCategory: 'すべて',
@@ -154,7 +189,6 @@ const firebaseConfig = {
 
     // --- Firebase Cloud Sync (リアルタイム共有) ---
     function startFirestoreListener(user) {
-      // 共有データ用のパス（偶数セグメントで安全に設定）
       const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'shared_pos', 'state');
       
       unsubSnapshot = onSnapshot(docRef, (snapshot) => {
@@ -173,7 +207,6 @@ const firebaseConfig = {
           
           render();
         } else {
-          // データがまだ存在しない（システム初起動）場合、この人が「管理者」になる
           if (user && user.email) {
             state.adminEmail = user.email;
           }
@@ -204,7 +237,7 @@ const firebaseConfig = {
     // --- 認証状態の監視 ---
     onAuthStateChanged(auth, (user) => {
       currentUser = user;
-      pendingRequestSent = false; // ログインが変わるたびにリセット
+      pendingRequestSent = false;
       if (user) {
         startFirestoreListener(user);
       } else {
@@ -250,7 +283,6 @@ const firebaseConfig = {
       await signOut(auth);
     };
 
-    // ユーザー権限管理のアクション
     window.approveUser = (email) => {
       state.pendingEmails = state.pendingEmails.filter(e => e !== email);
       if (!state.allowedEmails.includes(email)) state.allowedEmails.push(email);
@@ -964,6 +996,10 @@ const firebaseConfig = {
 
     // --- メインレンダリング処理 ---
     function render() {
+      // 初期ロード画面を確実に消す
+      const initialLoader = document.getElementById('initial-loading');
+      if (initialLoader) initialLoader.classList.add('hidden');
+
       // 1. 未ログインの場合
       if (!currentUser && typeof __initial_auth_token === 'undefined') {
         document.getElementById('app-container').classList.add('hidden');
@@ -1014,11 +1050,6 @@ const firebaseConfig = {
         const elToFocus = document.getElementById(activeElementId);
         if (elToFocus) setTimeout(() => elToFocus.focus(), 0);
       }
-    }
-
-    // Canvas環境以外では初期表示用にrenderを一度呼ぶ
-    if (typeof __initial_auth_token === 'undefined') {
-      document.addEventListener("DOMContentLoaded", render);
     }
   </script>
 </body>
