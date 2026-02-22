@@ -133,6 +133,9 @@
       printContent: null
     };
 
+    const CATEGORIES = ['すべて', 'ピザ', 'パスタ', '前菜', 'デザート', 'ドリンク'];
+    const TABLES = [1, 2, 3, 4, 5, 6];
+
     // --- Firebase Sync ---
     function startSync(user) {
       const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'shared', 'state');
@@ -180,9 +183,12 @@
     window.logout = () => signOut(auth);
     window.setTab = (t) => { state.activeTab = t; render(); };
     window.setTable = (t) => { state.selectedTable = t; state.isMobileCartOpen = false; render(); };
+    window.setSelectedCategory = (cat) => { state.selectedCategory = cat; render(); };
     window.toggleCart = (val) => { state.isMobileCartOpen = val; render(); };
     window.openCust = (id) => { state.customizingItem = { item: state.menu.find(m => m.id === id), note: '', extra: 0 }; render(); };
     window.closeCust = () => { state.customizingItem = null; render(); };
+    
+    // 注文の追加
     window.addOrder = () => {
       const note = document.getElementById('c-note')?.value.trim() || '';
       const extra = parseInt(document.getElementById('c-extra')?.value || 0);
@@ -195,12 +201,16 @@
       state.customizingItem = null;
       render(); save();
     };
+
+    // 数量の変更
     window.upQty = (i, d) => {
       const list = state.tableOrders[state.selectedTable];
       list[i].qty += d;
       if (list[i].qty <= 0) list.splice(i, 1);
       render(); save();
     };
+
+    // 厨房へ送信
     window.sendToK = () => {
       const order = state.tableOrders[state.selectedTable];
       const items = order.filter(o => !o.sent);
@@ -211,6 +221,8 @@
       state.printContent = { type: 'kitchen', data: ticket };
       render(); save();
     };
+
+    // お会計
     window.pay = () => {
       const order = state.tableOrders[state.selectedTable];
       const sub = order.reduce((s, o) => s + (o.item.price + o.extra) * o.qty, 0);
@@ -222,11 +234,15 @@
       state.isMobileCartOpen = false;
       render(); save();
     };
+
+    // 厨房の調理完了
     window.doneK = (id) => {
       const t = state.kitchenTickets.find(x => x.id === id);
       if (t) t.status = 'done';
       render(); save();
     };
+
+    // ユーザー権限管理
     window.approve = (email) => {
       state.pendingEmails = state.pendingEmails.filter(e => e !== email);
       state.allowedEmails.push(email);
@@ -236,6 +252,8 @@
       state.allowedEmails = state.allowedEmails.filter(e => e !== email);
       render(); save();
     };
+
+    // メニュー管理
     window.saveMenu = (e) => {
       e.preventDefault();
       const name = document.getElementById('m-name').value;
@@ -250,7 +268,63 @@
       state.editingMenu = null;
       render(); save();
     };
-    window.delMenu = (id) => { state.menu = state.menu.filter(m => m.id !== id); render(); save(); };
+    window.confirmDeleteMenu = (id) => { state.deletingMenuId = id; render(); };
+    window.cancelDeleteMenu = () => { state.deletingMenuId = null; render(); };
+    window.executeDeleteMenu = () => { 
+      state.menu = state.menu.filter(m => m.id !== state.deletingMenuId); 
+      state.deletingMenuId = null; 
+      render(); save(); 
+    };
+
+    // 顧客管理
+    window.setIsCustomerModalOpen = (isOpen) => { state.isCustomerModalOpen = isOpen; render(); };
+    window.saveCustomer = () => {
+      const name = document.getElementById('modal-cust-name').value.trim();
+      const note = document.getElementById('modal-cust-note').value.trim();
+      if (!name) return;
+      state.customers.push({ id: Date.now(), name, note });
+      state.isCustomerModalOpen = false;
+      render(); save();
+    };
+
+    // バックアップ機能
+    window.exportData = () => {
+      const dataToSave = { ...state };
+      ['isMobileCartOpen', 'customizingItem', 'editingMenu', 'deletingMenuId', 'isCustomerModalOpen', 'printContent'].forEach(k => delete dataToSave[k]);
+      const blob = new Blob([JSON.stringify(dataToSave, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `buonconto_backup_${new Date().toISOString().slice(0,10)}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+    };
+
+    window.triggerImport = () => document.getElementById('import-file-input').click();
+    
+    window.importData = (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        try {
+          const data = JSON.parse(ev.target.result);
+          if (data.menu) state.menu = data.menu;
+          if (data.customers) state.customers = data.customers;
+          if (data.storeInfo) state.storeInfo = data.storeInfo;
+          if (data.tableOrders) state.tableOrders = data.tableOrders;
+          if (data.salesRecord) state.salesRecord = data.salesRecord.map(r => ({ ...r, time: new Date(r.time) }));
+          if (data.kitchenTickets) state.kitchenTickets = data.kitchenTickets.map(t => ({ ...t, time: new Date(t.time) }));
+          if (data.adminEmail) state.adminEmail = data.adminEmail;
+          if (data.allowedEmails) state.allowedEmails = data.allowedEmails;
+          save(); render(); alert('データを復元しました。');
+        } catch (err) {
+          alert('ファイルの読み込みに失敗しました。');
+        }
+      };
+      reader.readAsText(file);
+      e.target.value = '';
+    };
 
     // --- Rendering ---
     function render() {
@@ -352,22 +426,28 @@
           </div>
           <!-- Cart -->
           <div id="cart-panel" class="fixed inset-y-0 right-0 w-full md:w-[380px] bg-white lg:bg-[#F4F7F5] shadow-2xl lg:shadow-none z-[100] transform transition-transform duration-300 ${state.isMobileCartOpen ? 'translate-x-0' : 'translate-x-full lg:translate-x-0'} flex flex-col border-l-2 border-gray-200">
-            <div class="p-4 bg-white border-b flex justify-between items-center shrink-0">
-              <span class="font-black text-xl text-[#0F543C]">卓: ${state.selectedTable}</span>
-              <div class="flex gap-1">
-                ${TABLES.map(t => `<button onclick="window.setTable(${t})" class="w-9 h-9 rounded-full font-bold border-2 ${state.selectedTable === t ? 'bg-[#0F543C] text-white border-[#0F543C]' : 'bg-white text-gray-400'}">${t}</button>`).join('')}
+            <div class="p-4 bg-white border-b flex flex-col gap-3 shrink-0">
+              <div class="flex justify-between items-center">
+                <span class="font-black text-xl text-[#0F543C]">卓: ${state.selectedTable}</span>
+                <div class="flex gap-1">
+                  ${TABLES.map(t => `<button onclick="window.setTable(${t})" class="w-9 h-9 rounded-full font-bold border-2 ${state.selectedTable === t ? 'bg-[#0F543C] text-white border-[#0F543C]' : 'bg-white text-gray-400'}">${t}</button>`).join('')}
+                </div>
+                <button onclick="window.toggleCart(false)" class="lg:hidden p-2"><i data-lucide="x"></i></button>
               </div>
-              <button onclick="window.toggleCart(false)" class="lg:hidden p-2"><i data-lucide="x"></i></button>
+              <div class="border-t border-dashed pt-3 flex justify-between items-center">
+                <span class="text-xs font-bold text-gray-500">顧客管理</span>
+                <button onclick="window.setIsCustomerModalOpen(true)" class="bg-[#0F543C] text-white px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1"><i data-lucide="user-plus" class="w-3 h-3"></i> お得意様登録</button>
+              </div>
             </div>
             <div class="flex-1 overflow-y-auto p-4 space-y-3">
               ${order.map((o, i) => `
                 <div class="bg-white p-3 rounded-xl border-2 ${o.sent ? 'border-gray-200 opacity-60' : 'border-[#0F543C] shadow-sm'}">
-                  <div class="flex justify-between font-bold text-sm"><span>${o.item.name}</span><span>¥${((o.item.price + o.extra) * o.qty).toLocaleString()}</span></div>
+                  <div class="flex justify-between font-bold text-sm"><span>${o.item.name}${o.sent?'<span class="ml-2 text-[10px] bg-gray-200 px-1 rounded">済</span>':''}</span><span>¥${((o.item.price + o.extra) * o.qty).toLocaleString()}</span></div>
                   ${o.note ? `<div class="text-[10px] text-red-500 font-bold mt-1">● ${o.note}</div>` : ''}
                   <div class="flex justify-between items-center mt-2">
                     <span class="text-[10px] text-gray-400">@¥${(o.item.price + o.extra).toLocaleString()}</span>
                     <div class="flex items-center gap-3 bg-gray-50 p-1 rounded-lg">
-                      <button onclick="window.upQty(${i},-1)" class="w-7 h-7 bg-white rounded border flex items-center justify-center"><i data-lucide="${o.qty === 1 ? 'trash-2' : 'minus'}" class="w-3 h-3"></i></button>
+                      <button onclick="window.upQty(${i},-1)" class="w-7 h-7 bg-white rounded border flex items-center justify-center"><i data-lucide="${o.qty === 1 ? 'trash-2' : 'minus'}" class="w-3 h-3 ${o.qty === 1 ? 'text-red-500' : ''}"></i></button>
                       <span class="font-bold text-sm w-4 text-center">${o.qty}</span>
                       <button onclick="window.upQty(${i},1)" class="w-7 h-7 bg-white rounded border flex items-center justify-center"><i data-lucide="plus" class="w-3 h-3"></i></button>
                     </div>
@@ -395,6 +475,7 @@
         <div class="p-4 lg:p-8 h-full overflow-y-auto pb-24">
           <h2 class="text-2xl font-black text-[#0F543C] mb-6 border-b-4 border-[#FFC700] pb-1 inline-block">厨房注文</h2>
           <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+            ${state.kitchenTickets.length === 0 ? '<div class="col-span-full py-10 text-center font-bold text-gray-400">現在、調理待ちはありません。</div>' : ''}
             ${state.kitchenTickets.map(t => `
               <div class="bg-white rounded-2xl border-2 ${t.status === 'pending' ? 'border-orange-400 border-l-[12px]' : 'border-gray-200 opacity-50'} overflow-hidden flex flex-col">
                 <div class="p-3 bg-gray-50 border-b flex justify-between items-center">
@@ -428,6 +509,7 @@
           <div class="bg-white rounded-3xl border-2 border-gray-200 overflow-hidden">
             <div class="p-4 bg-gray-50 border-b font-black">会計履歴</div>
             <div class="divide-y">
+              ${state.salesRecord.length === 0 ? '<div class="p-6 text-center text-gray-400 font-bold">まだ売上がありません。</div>' : ''}
               ${state.salesRecord.map(r => `
                 <div class="p-4 flex justify-between items-start hover:bg-gray-50">
                   <div>
@@ -448,23 +530,23 @@
         <div class="p-4 lg:p-8 h-full overflow-y-auto pb-24 max-w-4xl mx-auto w-full">
           <div class="flex justify-between items-center mb-6">
             <h2 class="text-2xl font-black text-[#0F543C]">商品管理</h2>
-            <button onclick="state.editingMenu={}; render();" class="bg-[#0F543C] text-white px-4 py-2 rounded-xl font-bold flex items-center gap-2"><i data-lucide="plus"></i>追加</button>
+            <button onclick="state.editingMenu={}; render();" class="bg-[#0F543C] text-white px-4 py-2 rounded-xl font-bold flex items-center gap-2"><i data-lucide="plus" class="w-4 h-4"></i>追加</button>
           </div>
           <div class="bg-white rounded-3xl border-2 border-gray-200 overflow-hidden">
             <table class="w-full text-left">
               <thead class="bg-gray-50 text-[10px] font-bold text-gray-400 uppercase tracking-wider">
-                <tr><th class="p-4">商品名</th><th class="p-4">カテゴリ</th><th class="p-4">価格</th><th class="p-4">操作</th></tr>
+                <tr><th class="p-4">商品名</th><th class="p-4 hidden sm:table-cell">カテゴリ</th><th class="p-4">価格</th><th class="p-4 text-right">操作</th></tr>
               </thead>
               <tbody class="divide-y">
                 ${state.menu.map(m => `
-                  <tr>
-                    <td class="p-4 font-bold">${m.name}</td>
-                    <td class="p-4 text-xs font-bold text-gray-500">${m.category}</td>
-                    <td class="p-4 font-black">¥${m.price.toLocaleString()}</td>
-                    <td class="p-4">
-                      <div class="flex gap-2">
-                        <button onclick="state.editingMenu={...state.menu.find(x=>x.id===${m.id})}; render();" class="p-2 bg-gray-100 rounded-lg"><i data-lucide="pencil" class="w-4 h-4"></i></button>
-                        <button onclick="window.delMenu(${m.id})" class="p-2 bg-red-50 text-red-500 rounded-lg"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+                  <tr class="hover:bg-gray-50">
+                    <td class="p-4 font-bold text-sm sm:text-base">${m.name}</td>
+                    <td class="p-4 text-xs font-bold text-gray-500 hidden sm:table-cell">${m.category}</td>
+                    <td class="p-4 font-black text-[#0F543C]">¥${m.price.toLocaleString()}</td>
+                    <td class="p-4 text-right">
+                      <div class="flex justify-end gap-2">
+                        <button onclick="state.editingMenu={...state.menu.find(x=>x.id===${m.id})}; render();" class="p-2 bg-gray-100 rounded-lg hover:bg-gray-200"><i data-lucide="pencil" class="w-4 h-4"></i></button>
+                        <button onclick="window.confirmDeleteMenu(${m.id})" class="p-2 bg-red-50 text-red-500 rounded-lg hover:bg-red-100"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
                       </div>
                     </td>
                   </tr>
@@ -482,15 +564,46 @@
 
       return `
         <div class="p-4 lg:p-8 h-full overflow-y-auto pb-24 max-w-4xl mx-auto w-full space-y-6">
+          
+          <!-- JSON Backup -->
           <div class="bg-white rounded-3xl p-6 border-2 border-gray-200">
-            <h3 class="font-black text-lg mb-4 flex items-center gap-2"><i data-lucide="store" class="text-[#0F543C]"></i>店舗情報</h3>
+            <h3 class="font-black text-lg mb-4 flex items-center gap-2"><i data-lucide="database" class="text-[#0F543C]"></i>データバックアップ</h3>
+            <p class="text-xs text-gray-500 font-bold mb-4 leading-relaxed">全てのデータはクラウドに自動保存されていますが、手動でJSONファイルとしてバックアップをダウンロード・復元することも可能です。</p>
+            <div class="flex flex-wrap gap-3">
+              <button onclick="window.exportData()" class="px-4 py-3 bg-[#0F543C] text-white font-bold rounded-xl flex items-center gap-2 shadow-sm"><i data-lucide="download" class="w-4 h-4"></i>保存(JSON)</button>
+              <button onclick="window.triggerImport()" class="px-4 py-3 bg-white border-2 border-[#0F543C] text-[#0F543C] font-bold rounded-xl flex items-center gap-2"><i data-lucide="upload" class="w-4 h-4"></i>復元(上書き)</button>
+              <input type="file" id="import-file-input" accept=".json" class="hidden" onchange="window.importData(event)">
+            </div>
+          </div>
+
+          <!-- Store Info -->
+          <div class="bg-white rounded-3xl p-6 border-2 border-gray-200">
+            <h3 class="font-black text-lg mb-4 flex items-center gap-2"><i data-lucide="store" class="text-[#0F543C]"></i>店舗情報 (レシート用)</h3>
             <div class="space-y-4">
               <div><label class="text-[10px] font-bold text-gray-400 block mb-1">店名</label><input type="text" id="s-name" value="${state.storeInfo.name}" class="w-full p-3 border-2 border-gray-200 rounded-xl font-bold"></div>
               <div><label class="text-[10px] font-bold text-gray-400 block mb-1">住所</label><input type="text" id="s-addr" value="${state.storeInfo.address}" class="w-full p-3 border-2 border-gray-200 rounded-xl font-bold"></div>
-              <button onclick="state.storeInfo.name=document.getElementById('s-name').value; state.storeInfo.address=document.getElementById('s-addr').value; save(); render();" class="w-full py-3 bg-[#0F543C] text-white font-bold rounded-xl">更新する</button>
+              <div><label class="text-[10px] font-bold text-gray-400 block mb-1">電話番号</label><input type="text" id="s-tel" value="${state.storeInfo.tel || ''}" class="w-full p-3 border-2 border-gray-200 rounded-xl font-bold"></div>
+              <button onclick="state.storeInfo.name=document.getElementById('s-name').value; state.storeInfo.address=document.getElementById('s-addr').value; state.storeInfo.tel=document.getElementById('s-tel').value; save(); render();" class="w-full py-3 bg-[#0F543C] text-white font-bold rounded-xl shadow-sm">情報を更新する</button>
+            </div>
+          </div>
+
+          <!-- Customers List -->
+          <div class="bg-white rounded-3xl border-2 border-gray-200 overflow-hidden">
+            <div class="p-5 bg-gray-50 border-b flex justify-between items-center">
+              <h3 class="font-black text-lg flex items-center gap-2"><i data-lucide="users" class="text-[#0F543C]"></i>お得意様一覧</h3>
+              <button onclick="window.setIsCustomerModalOpen(true)" class="bg-[#0F543C] text-white px-3 py-1.5 rounded-lg font-bold flex items-center gap-1 text-sm"><i data-lucide="plus" class="w-4 h-4"></i>登録</button>
+            </div>
+            <div class="overflow-x-auto">
+              <table class="w-full text-left min-w-[300px]">
+                <thead class="bg-gray-50 text-[10px] font-bold text-gray-400"><tr><th class="p-4 w-1/3">名前</th><th class="p-4">メモ</th></tr></thead>
+                <tbody class="divide-y">
+                  ${state.customers.length === 0 ? '<tr><td colspan="2" class="p-6 text-center text-gray-400 font-bold">登録されていません</td></tr>' : state.customers.map(c => `<tr><td class="p-4 font-bold">${c.name}</td><td class="p-4 text-sm text-gray-600">${c.note}</td></tr>`).join('')}
+                </tbody>
+              </table>
             </div>
           </div>
           
+          <!-- Access Control -->
           ${isAdmin ? `
             <div class="bg-white rounded-3xl p-6 border-4 border-[#0F543C]">
               <h3 class="font-black text-lg mb-4 flex items-center gap-2 text-[#0F543C]"><i data-lucide="shield-check"></i>アクセス権限管理</h3>
@@ -507,7 +620,7 @@
                 </div>
                 <div>
                   <p class="text-xs font-bold text-gray-400 mb-2">利用許可済み</p>
-                  ${state.allowedEmails.map(e => `
+                  ${state.allowedEmails.length === 0 ? '<p class="text-xs text-gray-300 font-bold">現在はありません</p>' : state.allowedEmails.map(e => `
                     <div class="flex justify-between items-center p-3 bg-gray-50 rounded-xl mb-2">
                       <span class="text-sm font-bold">${e}</span>
                       <button onclick="window.revoke('${e}')" class="text-red-500 font-bold text-xs">取消</button>
@@ -523,6 +636,8 @@
 
     function getModalsHTML() {
       let html = '';
+      
+      // カスタマイズモーダル
       if (state.customizingItem) {
         const { item } = state.customizingItem;
         html += `
@@ -544,6 +659,8 @@
           </div>
         `;
       }
+
+      // メニュー編集モーダル
       if (state.editingMenu) {
         const m = state.editingMenu;
         html += `
@@ -563,6 +680,49 @@
           </div>
         `;
       }
+
+      // メニュー削除確認モーダル
+      if (state.deletingMenuId) {
+        const item = state.menu.find(m => m.id === state.deletingMenuId);
+        if (item) {
+          html += `
+            <div class="fixed inset-0 z-[300] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+              <div class="bg-white rounded-3xl shadow-2xl max-w-sm w-full overflow-hidden border-4 border-red-500 text-center">
+                <div class="p-6">
+                  <i data-lucide="alert-triangle" class="w-12 h-12 text-red-500 mx-auto mb-4"></i>
+                  <h3 class="text-xl font-black mb-2">削除の確認</h3>
+                  <p class="text-gray-600 font-bold text-sm">「${item.name}」をメニューから完全に削除しますか？</p>
+                </div>
+                <div class="p-4 bg-gray-50 border-t flex gap-3">
+                  <button onclick="window.cancelDeleteMenu()" class="flex-1 py-3 bg-white border-2 border-gray-300 rounded-xl font-bold">やめる</button>
+                  <button onclick="window.executeDeleteMenu()" class="flex-1 py-3 bg-red-500 text-white font-bold rounded-xl shadow-lg">削除する</button>
+                </div>
+              </div>
+            </div>
+          `;
+        }
+      }
+
+      // 顧客登録モーダル
+      if (state.isCustomerModalOpen) {
+        html += `
+          <div class="fixed inset-0 z-[300] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+            <div class="bg-white rounded-3xl shadow-2xl max-w-md w-full overflow-hidden border-4 border-[#0F543C]">
+              <div class="p-6 bg-[#F4F7F5] border-b-2 font-black text-xl flex items-center gap-2"><i data-lucide="user-plus" class="w-5 h-5"></i> お得意様登録</div>
+              <div class="p-6 space-y-4">
+                <div><label class="block font-black mb-1 text-xs">お名前</label><input type="text" id="modal-cust-name" class="w-full p-3 border-2 border-gray-200 rounded-xl font-bold" placeholder="例: 山田様"></div>
+                <div><label class="block font-bold mb-1 text-xs">メモ・特徴</label><textarea id="modal-cust-note" rows="3" class="w-full p-3 border-2 border-gray-200 rounded-xl font-bold" placeholder="ワインが好き 等"></textarea></div>
+              </div>
+              <div class="p-4 bg-gray-50 border-t flex gap-3">
+                <button onclick="window.setIsCustomerModalOpen(false)" class="flex-1 py-3 bg-white border-2 border-gray-300 rounded-xl font-bold">キャンセル</button>
+                <button onclick="window.saveCustomer()" class="flex-1 py-3 bg-[#0F543C] text-white font-bold rounded-xl shadow-lg">登録する</button>
+              </div>
+            </div>
+          </div>
+        `;
+      }
+
+      // 印刷プレビューモーダル
       if (state.printContent) {
         const { type, data } = state.printContent;
         html += `
@@ -576,15 +736,15 @@
                     <div class="flex justify-between font-bold mb-2"><span>卓: ${data.table}</span><span>${formatTime(data.time)}</span></div>
                     ${data.items.map(o => `<div class="border-b border-black py-1"><div class="flex justify-between font-black text-sm"><span>${o.item.name}</span><span>x ${o.qty}</span></div>${o.note?`<div class="mt-0.5">※ ${o.note}</div>`:''}</div>`).join('')}
                   ` : `
-                    <div class="text-center mb-4"><h2 class="text-lg font-black">${state.storeInfo.name}</h2><p>${state.storeInfo.address}</p></div>
+                    <div class="text-center mb-4"><h2 class="text-lg font-black">${state.storeInfo.name}</h2><p>${state.storeInfo.address}</p><p>${state.storeInfo.tel || ''}</p></div>
                     <div class="flex justify-between mb-2"><span>卓: ${data.table}</span><span>${formatTime(data.time)}</span></div>
                     <div class="border-y border-dashed border-black py-2 mb-2">
-                      ${data.items.map(o => `<div class="flex justify-between mb-1"><span>${o.item.name} x${o.qty}</span><span>¥${((o.item.price+o.extra)*o.qty).toLocaleString()}</span></div>`).join('')}
+                      ${data.items.map(o => `<div class="flex justify-between mb-1"><span>${o.item.name} x${o.qty}</span><span>¥${((o.item.price+o.extra)*o.qty).toLocaleString()}</span></div>${o.note||o.extra?`<div class="text-[9px] text-gray-500 pl-2">(${o.note||''}${o.note&&o.extra?', ':''}${o.extra?'+¥'+o.extra:''})</div>`:''}`).join('')}
                     </div>
                     <div class="flex justify-between"><span>小計</span><span>¥${data.subtotal.toLocaleString()}</span></div>
                     <div class="flex justify-between"><span>消費税</span><span>¥${data.tax.toLocaleString()}</span></div>
                     <div class="flex justify-between font-black text-lg mt-1 pt-1 border-t border-black"><span>合計</span><span>¥${data.total.toLocaleString()}</span></div>
-                    <p class="text-center mt-4">${state.storeInfo.message}</p>
+                    <p class="text-center mt-4 whitespace-pre-line">${state.storeInfo.message}</p>
                   `}
                 </div>
               </div>
@@ -608,10 +768,10 @@
           <div class="flex justify-between font-bold mb-4 text-lg"><span>テーブル: ${data.table}</span><span>${formatTime(data.time)}</span></div>
           ${data.items.map(o => `<div class="border-b border-black py-2"><div class="flex justify-between font-black text-xl"><span>${o.item.name}</span><span>x ${o.qty}</span></div>${o.note ? `<div class="mt-1 font-bold">※ ${o.note}</div>` : ''}</div>`).join('')}
         ` : `
-          <div class="text-center mb-6"><h2 class="text-2xl font-black mb-1">${state.storeInfo.name}</h2><p class="text-xs">${state.storeInfo.address}</p></div>
+          <div class="text-center mb-6"><h2 class="text-2xl font-black mb-1">${state.storeInfo.name}</h2><p class="text-xs">${state.storeInfo.address}</p><p class="text-xs">${state.storeInfo.tel || ''}</p></div>
           <div class="flex justify-between mb-4"><span>卓: ${data.table}</span><span>${formatTime(data.time)}</span></div>
           <div class="border-y border-dashed border-black py-4 mb-4">
-            ${data.items.map(o => `<div class="flex justify-between mb-1"><span>${o.item.name} x${o.qty}</span><span>¥${((o.item.price+o.extra)*o.qty).toLocaleString()}</span></div>`).join('')}
+            ${data.items.map(o => `<div class="flex justify-between mb-1"><span>${o.item.name} x${o.qty}</span><span>¥${((o.item.price+o.extra)*o.qty).toLocaleString()}</span></div>${o.note||o.extra?`<div class="text-[10px] text-gray-500 pl-2">(${o.note||''}${o.note&&o.extra?', ':''}${o.extra?'+¥'+o.extra:''})</div>`:''}`).join('')}
           </div>
           <div class="flex justify-between mb-1"><span>小計</span><span>¥${data.subtotal.toLocaleString()}</span></div>
           <div class="flex justify-between mb-1"><span>消費税(10%)</span><span>¥${data.tax.toLocaleString()}</span></div>
